@@ -12,7 +12,7 @@ const FRASES = [
   '¿Qué cocinamos hoy?',
   '¿Sale algo rico?',
   '¿Qué se te antoja?',
-  '¿Qué hay para comer?',
+  '¿Con ganas de cocinar...?',
 ];
 
 export default function HomeScreen() {
@@ -37,6 +37,17 @@ export default function HomeScreen() {
             <Feather name="heart" size={20} color={colors.surface} />
           </Pressable>
         </View>
+
+        {/* Barra de búsqueda */}
+        <Pressable
+          onPress={() => router.push('/buscar')}
+          accessibilityLabel="Buscar recetas"
+          accessibilityRole="button"
+          style={styles.searchBar}
+        >
+          <Feather name="search" size={18} color={colors.textMuted} />
+          <Text style={styles.searchPlaceholder}>Buscá recetas, ingredientes...</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -76,5 +87,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  searchPlaceholder: {
+    ...typography.bodyM,
+    color: colors.textMuted,
   },
 });
