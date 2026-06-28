@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -7,8 +7,27 @@ import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { CategoryPill } from '@/components/molecules/CategoryPill';
+import { SectionHeader } from '@/components/molecules/SectionHeader';
+import { RecipeCard } from '@/components/molecules/RecipeCard';
+import { useRecipes } from '@/hooks/useRecipes';
+import { useLikes } from '@/hooks/useLikes';
+import { Category } from '@/types';
+
+const SCREEN_W = Dimensions.get('window').width;
+const CARD_GAP = spacing.md;
+const CARD_W = (SCREEN_W - spacing.lg * 2 - CARD_GAP) / 2;
 
 const CATEGORIAS = ['Todas', 'Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Postres'];
+
+// Mapeo entre labels del UI y valores del tipo Category
+const CATEGORIA_MAP: Record<string, Category | null> = {
+  'Todas':    null,
+  'Desayuno': 'Desayuno',
+  'Almuerzo': 'Almuerzo',
+  'Merienda': 'Snack',
+  'Cena':     'Cena',
+  'Postres':  'Postre',
+};
 
 const FRASES = [
   '¿En qué te inspirás hoy?',
@@ -23,9 +42,19 @@ export default function HomeScreen() {
   const frase = useMemo(() => FRASES[Math.floor(Math.random() * FRASES.length)], []);
   const [categoriaActiva, setCategoriaActiva] = useState('Todas');
 
+  const { getAll, getByCategory } = useRecipes();
+  const { toggleLike, isLiked } = useLikes();
+
+  const recetas = useMemo(() => {
+    const catFiltro = CATEGORIA_MAP[categoriaActiva];
+    const resultado = catFiltro ? getByCategory(catFiltro) : getAll();
+    return resultado.slice(0, 8);
+  }, [categoriaActiva]);
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
         {/* Header */}
         <View style={styles.header}>
           <View>
@@ -52,6 +81,7 @@ export default function HomeScreen() {
           <Feather name="search" size={18} color={colors.textMuted} />
           <Text style={styles.searchPlaceholder}>Buscá recetas, ingredientes...</Text>
         </Pressable>
+
         {/* Categorías */}
         <Text style={styles.sectionTitle}>Categorías</Text>
         <ScrollView
@@ -68,6 +98,25 @@ export default function HomeScreen() {
             />
           ))}
         </ScrollView>
+
+        {/* Recetas */}
+        <SectionHeader
+          title="Recetas"
+          onSeeAll={() => router.push('/buscar')}
+        />
+        <View style={styles.grid}>
+          {recetas.map(recipe => (
+            <RecipeCard
+              key={recipe.id}
+              recipe={recipe}
+              variant="compact"
+              width={CARD_W}
+              isLiked={isLiked(recipe.id)}
+              onPress={() => router.push(`/recipe/${recipe.id}`)}
+              onLike={() => toggleLike(recipe.id)}
+            />
+          ))}
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -135,5 +184,11 @@ const styles = StyleSheet.create({
   pillsRow: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.lg,
+    gap: CARD_GAP,
   },
 });
