@@ -3,12 +3,12 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 
-export default function HomeScreen() {
+export default function PerfilScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.center}>
-        <Text style={styles.title}>Inicio</Text>
-        <Text style={styles.sub}>Buenos días 🔥 ¿Qué vas a cocinar hoy?</Text>
+        <Text style={styles.title}>Perfil</Text>
+        <Text style={styles.sub}>Tu cuenta y configuración</Text>
       </View>
     </SafeAreaView>
   );
