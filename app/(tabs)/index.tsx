@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -6,6 +6,9 @@ import { Feather } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
+import { CategoryPill } from '@/components/molecules/CategoryPill';
+
+const CATEGORIAS = ['Todas', 'Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Postres'];
 
 const FRASES = [
   '¿En qué te inspirás hoy?',
@@ -18,6 +21,7 @@ const FRASES = [
 export default function HomeScreen() {
   const router = useRouter();
   const frase = useMemo(() => FRASES[Math.floor(Math.random() * FRASES.length)], []);
+  const [categoriaActiva, setCategoriaActiva] = useState('Todas');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -48,6 +52,23 @@ export default function HomeScreen() {
           <Feather name="search" size={18} color={colors.textMuted} />
           <Text style={styles.searchPlaceholder}>Buscá recetas, ingredientes...</Text>
         </Pressable>
+        {/* Categorías */}
+        <Text style={styles.sectionTitle}>Categorías</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pillsRow}
+        >
+          {CATEGORIAS.map(cat => (
+            <CategoryPill
+              key={cat}
+              label={cat}
+              active={categoriaActiva === cat}
+              onPress={() => setCategoriaActiva(cat)}
+            />
+          ))}
+        </ScrollView>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -104,5 +125,15 @@ const styles = StyleSheet.create({
   searchPlaceholder: {
     ...typography.bodyM,
     color: colors.textMuted,
+  },
+  sectionTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  pillsRow: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
   },
 });
