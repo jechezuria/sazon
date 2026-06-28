@@ -7,9 +7,9 @@ import { typography } from '../../theme/typography';
 import { spacing, radius } from '../../theme/spacing';
 import { shadows } from '../../theme/shadows';
 import { Recipe } from '../../types';
+import { Ionicons } from '@expo/vector-icons';
 import { Tag } from '../atoms/Tag';
 import { Avatar } from '../atoms/Avatar';
-import { IconButton } from '../atoms/IconButton';
 
 type RecipeCardVariant = 'full' | 'compact';
 
@@ -60,16 +60,18 @@ function FullCard({ recipe, isLiked, onPress, onLike, width }: Omit<RecipeCardPr
         <Tag label={recipe.category} variant="category" size="sm" />
       </View>
       {onLike && (
-        <View style={styles.likeButton}>
-          <IconButton
-            icon={isLiked ? 'heart' : 'heart'}
-            onPress={onLike}
-            variant="surface"
-            size="sm"
-            color={isLiked ? colors.primary : colors.textSecondary}
-            accessibilityLabel={isLiked ? 'Quitar me gusta' : 'Me gusta'}
+        <Pressable
+          onPress={onLike}
+          accessibilityLabel={isLiked ? 'Quitar me gusta' : 'Me gusta'}
+          accessibilityRole="button"
+          style={styles.likeButton}
+        >
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={16}
+            color={colors.error}
           />
-        </View>
+        </Pressable>
       )}
       <View style={styles.fullOverlay}>
         <Text style={styles.fullTitle} numberOfLines={2}>{recipe.title}</Text>
@@ -102,16 +104,18 @@ function CompactCard({ recipe, isLiked, onPress, onLike, width }: Omit<RecipeCar
         placeholder={{ color: colors.primaryLight }}
       />
       {onLike && (
-        <View style={styles.compactLike}>
-          <IconButton
-            icon="heart"
-            onPress={onLike}
-            variant="surface"
-            size="sm"
-            color={isLiked ? colors.primary : colors.textSecondary}
-            accessibilityLabel={isLiked ? 'Quitar me gusta' : 'Me gusta'}
+        <Pressable
+          onPress={onLike}
+          accessibilityLabel={isLiked ? 'Quitar me gusta' : 'Me gusta'}
+          accessibilityRole="button"
+          style={styles.compactLike}
+        >
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={16}
+            color={colors.error}
           />
-        </View>
+        </Pressable>
       )}
       <View style={styles.compactInfo}>
         <Text style={styles.compactTitle} numberOfLines={2}>{recipe.title}</Text>
@@ -139,6 +143,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.md,
     right: spacing.md,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fullOverlay: {
     position: 'absolute',
@@ -190,6 +200,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.sm,
     right: spacing.sm,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   compactInfo: {
     padding: spacing.md,
