@@ -469,17 +469,57 @@ tabActive: {
 
 **`{index < recipe.ingredients.length - 1 && <View ... />}`** — el separador solo aparece entre ítems, no después del último. `length - 1` es el índice del último elemento.
 
+**Badge del ingrediente — transparente con número, verde con check al marcar:**
+
+```tsx
+<View style={[
+  styles.ingredientBadge,
+  checked.has(ing.id) && styles.ingredientBadgeChecked,
+]}>
+  {checked.has(ing.id) ? (
+    <Ionicons name="checkmark" size={14} color={colors.surface} />
+  ) : (
+    <Text style={styles.ingredientNumber}>{index + 1}</Text>
+  )}
+</View>
+```
+
+- Sin marcar: círculo con borde `colors.border`, fondo transparente, número del ingrediente
+- Marcado: fondo `colors.success` (verde), borde verde, ícono `checkmark` blanco
+
 ```ts
+ingredientBadge: {
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  borderWidth: 1.5,
+  borderColor: colors.border,
+  backgroundColor: 'transparent',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+},
+ingredientBadgeChecked: {
+  backgroundColor: colors.success,
+  borderColor: colors.success,
+},
+ingredientNumber: {
+  ...typography.caption,
+  fontWeight: '600',
+  color: colors.textMuted,
+},
 ingredientChecked: {
-  textDecorationLine: 'line-through',   // tachado
-  color: colors.textMuted,              // más suave
+  textDecorationLine: 'line-through',
+  color: colors.textMuted,
 },
 ingredientSep: {
   height: 1,
   backgroundColor: colors.border,
-  marginLeft: 32,                       // alineado después del radio button
+  marginLeft: 40,   // 28px badge + 12px gap
 },
 ```
+
+> **Por qué `marginLeft: 40` y no `32`:** el badge ahora mide 28px (antes era un ícono de 20px). 28 + 12 (gap) = 40. El separador empieza alineado con el texto del ingrediente.
 
 ---
 

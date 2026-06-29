@@ -163,11 +163,16 @@ export default function RecipeDetailScreen() {
                   onPress={() => toggleCheck(ing.id)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons
-                    name={checked.has(ing.id) ? 'radio-button-on' : 'radio-button-off'}
-                    size={20}
-                    color={checked.has(ing.id) ? colors.primary : colors.textMuted}
-                  />
+                  <View style={[
+                    styles.ingredientBadge,
+                    checked.has(ing.id) && styles.ingredientBadgeChecked,
+                  ]}>
+                    {checked.has(ing.id) ? (
+                      <Ionicons name="checkmark" size={14} color={colors.surface} />
+                    ) : (
+                      <Text style={styles.ingredientNumber}>{index + 1}</Text>
+                    )}
+                  </View>
                   <Text style={[
                     styles.ingredientName,
                     checked.has(ing.id) && styles.ingredientChecked,
@@ -365,6 +370,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
   },
+  ingredientBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  ingredientBadgeChecked: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  ingredientNumber: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
   ingredientName: {
     ...typography.bodyM,
     color: colors.textPrimary,
@@ -381,7 +406,7 @@ const styles = StyleSheet.create({
   ingredientSep: {
     height: 1,
     backgroundColor: colors.border,
-    marginLeft: 32,
+    marginLeft: 40,  // 28px badge + 12px gap
   },
 
   // 7B — Pasos
