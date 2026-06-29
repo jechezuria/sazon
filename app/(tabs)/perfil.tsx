@@ -198,6 +198,12 @@ export default function PerfilScreen() {
             label="Mis publicaciones"
             onPress={() => {}}
           />
+          <Separator/>
+          <MenuItem
+            icon="heart-outline"
+            label="Mis favoritos"
+            onPress={() => router.push("favoritos")}
+          />
           <Separator />
           <MenuItem
             icon="add-circle-outline"

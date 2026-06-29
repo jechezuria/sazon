@@ -42,7 +42,7 @@ export default function FavoritosScreen() {
 
         {/* 📑 Menú de pestañas superiores */}
         <View style={styles.tabsRow}>
-          {['Saved', 'Collections', 'Offline'].map((tab) => (
+          {['Saved'].map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
