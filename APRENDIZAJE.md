@@ -463,6 +463,54 @@ const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arr
 
 ---
 
+### Paso 5: Resultados de búsqueda
+
+```tsx
+const resultados = useMemo(() => {
+  if (query.trim().length === 0) return [];
+  return search(query.trim());
+}, [query]);
+```
+> `query.trim()` elimina espacios al inicio y al final — evita que un espacio accidental dispare una búsqueda vacía.
+> Si no hay texto, devuelve array vacío sin ni siquiera llamar a `search()`. `useMemo` recalcula solo cuando `query` cambia.
+
+```tsx
+{query.trim().length > 0 ? (
+  resultados.length > 0 ? (
+    /* grilla de resultados */
+  ) : (
+    /* estado vacío */
+  )
+) : (
+  /* recientes + ingredientes */
+)}
+```
+> Tres estados posibles manejados con ternarios anidados:
+> 1. Sin texto → pantalla de descubrimiento (recientes + ingredientes)
+> 2. Con texto + resultados → grilla de cards
+> 3. Con texto + sin resultados → estado vacío con mensaje
+>
+> Los ternarios anidados pueden ser difíciles de leer. Una alternativa más clara sería extraer cada estado a una función o componente separado, pero para tres estados simples está bien así.
+
+```tsx
+<Text style={styles.sectionLabel}>
+  {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
+</Text>
+```
+> Pluralización manual: si hay 1 resultado dice "1 resultado", si hay más dice "2 resultados". El ternario `!== 1 ? 's' : ''` agrega la "s" solo cuando corresponde.
+
+**Estado vacío (empty state)**
+```tsx
+<View style={styles.emptyState}>
+  <Feather name="search" size={40} color={colors.textMuted} />
+  <Text style={styles.emptyTitle}>Sin resultados</Text>
+  <Text style={styles.emptySubtitle}>No encontramos recetas para "{query}"</Text>
+</View>
+```
+> El empty state es importante en UX — sin él el usuario ve una pantalla en blanco y no sabe si algo falló o simplemente no hay resultados. Mostrar el término buscado entre comillas confirma que la app sí procesó la búsqueda.
+
+---
+
 ## Conceptos clave de React Native
 
 ### Flexbox en React Native

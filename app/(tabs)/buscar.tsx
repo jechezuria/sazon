@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
+  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,11 +9,19 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { CategoryPill } from '@/components/molecules/CategoryPill';
+import { RecipeCard } from '@/components/molecules/RecipeCard';
+import { useRecipes } from '@/hooks/useRecipes';
+import { useLikes } from '@/hooks/useLikes';
+
+const SCREEN_W = Dimensions.get('window').width;
+const CARD_GAP = spacing.md;
+const CARD_W = (SCREEN_W - spacing.lg * 2 - CARD_GAP) / 2;
 
 const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
 
@@ -21,10 +30,19 @@ const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
 const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arroz', 'Queso'];
 
 export default function BuscarScreen() {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [filtroActivo, setFiltroActivo] = useState('Todo');
   const inputRef = useRef<TextInput>(null);
+
+  const { search } = useRecipes();
+  const { toggleLike, isLiked } = useLikes();
+
+  const resultados = useMemo(() => {
+    if (query.trim().length === 0) return [];
+    return search(query.trim());
+  }, [query]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -78,35 +96,65 @@ export default function BuscarScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Búsquedas recientes */}
-        <Text style={styles.sectionLabel}>Búsquedas recientes</Text>
-        <View style={styles.recentList}>
-          {RECIENTES.map(term => (
-            <Pressable
-              key={term}
-              onPress={() => setQuery(term)}
-              accessibilityRole="button"
-              style={styles.recentItem}
-            >
-              <Feather name="clock" size={16} color={colors.textMuted} />
-              <Text style={styles.recentText}>{term}</Text>
-              <Feather name="arrow-right" size={16} color={colors.textMuted} />
-            </Pressable>
-          ))}
-        </View>
+        {query.trim().length > 0 ? (
+          /* ── Resultados ── */
+          resultados.length > 0 ? (
+            <>
+              <Text style={styles.sectionLabel}>{resultados.length} resultado{resultados.length !== 1 ? 's' : ''}</Text>
+              <View style={styles.grid}>
+                {resultados.map(recipe => (
+                  <RecipeCard
+                    key={recipe.id}
+                    recipe={recipe}
+                    variant="compact"
+                    width={CARD_W}
+                    isLiked={isLiked(recipe.id)}
+                    onPress={() => router.push(`/recipe/${recipe.id}`)}
+                    onLike={() => toggleLike(recipe.id)}
+                  />
+                ))}
+              </View>
+            </>
+          ) : (
+            /* ── Sin resultados ── */
+            <View style={styles.emptyState}>
+              <Feather name="search" size={40} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>Sin resultados</Text>
+              <Text style={styles.emptySubtitle}>No encontramos recetas para "{query}"</Text>
+            </View>
+          )
+        ) : (
+          /* ── Estado inicial: recientes + ingredientes ── */
+          <>
+            <Text style={styles.sectionLabel}>Búsquedas recientes</Text>
+            <View style={styles.recentList}>
+              {RECIENTES.map(term => (
+                <Pressable
+                  key={term}
+                  onPress={() => setQuery(term)}
+                  accessibilityRole="button"
+                  style={styles.recentItem}
+                >
+                  <Feather name="clock" size={16} color={colors.textMuted} />
+                  <Text style={styles.recentText}>{term}</Text>
+                  <Feather name="arrow-right" size={16} color={colors.textMuted} />
+                </Pressable>
+              ))}
+            </View>
 
-        {/* Buscar por ingrediente */}
-        <Text style={[styles.sectionLabel, styles.sectionLabelTop]}>Buscar por ingrediente</Text>
-        <View style={styles.ingredientesWrap}>
-          {INGREDIENTES.map(ing => (
-            <CategoryPill
-              key={ing}
-              label={ing}
-              active={query === ing}
-              onPress={() => setQuery(query === ing ? '' : ing)}
-            />
-          ))}
-        </View>
+            <Text style={[styles.sectionLabel, styles.sectionLabelTop]}>Buscar por ingrediente</Text>
+            <View style={styles.ingredientesWrap}>
+              {INGREDIENTES.map(ing => (
+                <CategoryPill
+                  key={ing}
+                  label={ing}
+                  active={query === ing}
+                  onPress={() => setQuery(query === ing ? '' : ing)}
+                />
+              ))}
+            </View>
+          </>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -200,5 +248,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: CARD_GAP,
+    marginTop: spacing.md,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: spacing['4xl'],
+    gap: spacing.md,
+  },
+  emptyTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+  },
+  emptySubtitle: {
+    ...typography.bodyM,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
