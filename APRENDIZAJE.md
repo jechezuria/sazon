@@ -305,6 +305,78 @@ compactLike: {
 
 ---
 
+## `app/(tabs)/buscar.tsx` — Pantalla de Búsqueda
+
+### Paso 1: Header + barra de búsqueda
+
+**¿Por qué esta pantalla es diferente al buscador del Home?**
+En el Home la barra es un `Pressable` decorativo — al tocarla te lleva a esta pantalla. Acá es un `TextInput` real donde el usuario escribe, React guarda el texto y lo usa para filtrar recetas.
+
+```tsx
+const [query, setQuery] = useState('');
+const [focused, setFocused] = useState(false);
+const inputRef = useRef<TextInput>(null);
+```
+> Dos estados independientes:
+> - `query` — el texto que escribe el usuario
+> - `focused` — si el input está activo o no (para cambiar el estilo del borde)
+>
+> `useRef` guarda una referencia directa al componente `TextInput`. No es un valor de estado — no provoca re-renders. Sirve para llamar métodos del input desde afuera, como `.focus()`.
+
+```tsx
+<Pressable onPress={() => inputRef.current?.focus()} style={[styles.searchBar, focused && styles.searchBarFocused]}>
+```
+> El `Pressable` externo hace que tocar en cualquier parte de la barra (no solo el input) enfoque el cursor. Sin esto, el usuario tendría que tocar exactamente el texto para activar el teclado.
+> `inputRef.current?.focus()` — el `?.` es optional chaining: si `current` es null (el componente no montó todavía), no falla.
+
+```tsx
+// Estilo dinámico según el estado focused
+style={[styles.searchBar, focused && styles.searchBarFocused]}
+```
+> React Native acepta arrays de estilos. El último estilo del array gana en caso de conflicto. `focused && styles.searchBarFocused` devuelve el objeto de estilo si `focused` es true, o `false` si no — React Native ignora los valores falsy en el array de estilos.
+
+```tsx
+searchBar: {
+  borderColor: colors.border,     // Gris por defecto
+},
+searchBarFocused: {
+  borderColor: colors.primary,    // Naranja cuando está activo
+  backgroundColor: colors.surface, // Fondo blanco (era crema)
+},
+```
+> El cambio de borde naranja al enfocar le da feedback visual al usuario: "estás escribiendo acá". Es un patrón estándar de UX para inputs.
+
+```tsx
+{query.length > 0 && (
+  <Pressable onPress={() => setQuery('')} accessibilityLabel="Limpiar búsqueda">
+    <Feather name="x" size={16} color={colors.textMuted} />
+  </Pressable>
+)}
+```
+> El botón de limpiar (`x`) solo aparece cuando hay texto escrito. `query.length > 0` evalúa a `true` si hay al menos un caracter — el cortocircuito `&&` renderiza el componente solo si la condición es verdadera.
+
+```tsx
+<TextInput
+  returnKeyType="search"   // Muestra "Buscar" en el teclado en lugar de "Intro"
+  autoCorrect={false}      // Evita que corrija ingredientes o nombres propios
+/>
+```
+
+```tsx
+// Header con bordes redondeados abajo
+header: {
+  backgroundColor: colors.surface,
+  borderBottomLeftRadius: radius.xl,   // Solo los bordes inferiores
+  borderBottomRightRadius: radius.xl,
+  shadowColor: '#000',
+  shadowOpacity: 0.05,                 // Sombra muy sutil — solo para separarlo del fondo
+  elevation: 3,
+}
+```
+> Redondear solo los bordes inferiores crea el efecto de "card que sale de arriba". Los bordes superiores quedan rectos contra el borde de la pantalla.
+
+---
+
 ## Conceptos clave de React Native
 
 ### Flexbox en React Native

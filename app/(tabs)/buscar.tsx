@@ -1,216 +1,136 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
+import { spacing, radius } from '@/theme/spacing';
+import { CategoryPill } from '@/components/molecules/CategoryPill';
 
-// Datos para las categorías y los ingredientes
-const CATEGORIES = [
-  { id: '1', label: 'Cena rápida', icon: '🌙' },
-  { id: '2', label: 'Vegano', icon: '🌿' },
-  { id: '3', label: 'Postres', icon: '🍰' },
-  { id: '4', label: 'Saludable', icon: '🥗' },
-];
-
-const INGREDIENTS = [
-  { id: '1', emoji: '🥑', label: 'Palta' },
-  { id: '2', emoji: '🍗', label: 'Pollo' },
-  { id: '3', emoji: '🍋', label: 'Limón' },
-  { id: '4', emoji: '🥚', label: 'Huevo' },
-];
+const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
 
 export default function BuscarScreen() {
   const [query, setQuery] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [filtroActivo, setFiltroActivo] = useState('Todo');
+  const inputRef = useRef<TextInput>(null);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* 🔍 Header con Buscador Estilo Sazón */}
+    <SafeAreaView style={styles.safe}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explorar</Text>
-        <View style={styles.searchBox}>
-          <Text style={{ fontSize: 16 }}>🔍</Text>
+        <Text style={styles.title}>Buscar recetas</Text>
+
+        {/* Barra de búsqueda — real TextInput, no decorativa */}
+        <Pressable onPress={() => inputRef.current?.focus()} style={[styles.searchBar, focused && styles.searchBarFocused]}>
+          <Feather
+            name="search"
+            size={18}
+            color={focused ? colors.primary : colors.textMuted}
+          />
           <TextInput
-            style={styles.searchInput}
-            placeholder="¿Qué quieres cocinar hoy?"
+            ref={inputRef}
+            style={styles.input}
+            placeholder="Buscá recetas, ingredientes..."
             placeholderTextColor={colors.textMuted}
             value={query}
             onChangeText={setQuery}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            returnKeyType="search"
+            autoCorrect={false}
           />
-        </View>
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')} accessibilityLabel="Limpiar búsqueda">
+              <Feather name="x" size={16} color={colors.textMuted} />
+            </Pressable>
+          )}
+        </Pressable>
+
+        {/* Pills de filtro — dentro del header para mantener el fondo blanco */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pillsRow}
+          style={styles.pillsScroll}
+        >
+          {FILTROS.map(filtro => (
+            <CategoryPill
+              key={filtro}
+              label={filtro}
+              active={filtroActivo === filtro}
+              onPress={() => setFiltroActivo(filtro)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
-                {/* 🏷️ Sección de Categorías */}
-                <Text style={styles.sectionLabel}>DESTACADOS</Text>
-                <View style={styles.categoryGrid}>
-                  {CATEGORIES.map((cat) => (
-                    <TouchableOpacity key={cat.id} style={styles.categoryCard}>
-                      <View style={styles.catIconContainer}>
-                        <Text style={{ fontSize: 22 }}>{cat.icon}</Text>
-                      </View>
-                      <Text style={styles.categoryCardText}>{cat.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* 🥦 Sección de Ingredientes */}
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionLabel}>POR INGREDIENTE</Text>
-                  <TouchableOpacity><Text style={styles.seeAll}>Ver todos</Text></TouchableOpacity>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.ingredientScroll}>
-                  {INGREDIENTS.map((ing) => (
-                    <TouchableOpacity key={ing.id} style={styles.ingredientCircle}>
-                      <View style={styles.emojiBg}>
-                        <Text style={{ fontSize: 24 }}>{ing.emoji}</Text>
-                      </View>
-                      <Text style={styles.ingredientName}>{ing.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
-                {/* 🕐 Búsquedas Recientes */}
-                <Text style={styles.sectionLabel}>RECIENTES</Text>
-                <View style={styles.historyContainer}>
-                  {['Pasta', 'Tacos', 'Ensalada'].map((term) => (
-                    <View key={term} style={styles.historyTag}>
-                      <Text style={styles.historyText}>{term}</Text>
-                    </View>
-                  ))}
-                </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* El resto de las secciones van acá */}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surface,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
     backgroundColor: colors.surface,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    // Sombra sutil para darle profundidad
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
   },
-  headerTitle: {
+  title: {
     ...typography.displayL,
     color: colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
-  searchBox: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+    height: 48,
     backgroundColor: colors.bg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 50,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    ...typography.bodyM,
-    color: colors.textPrimary,
-  },
-  scrollBody: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  sectionLabel: {
-    ...typography.label,
-    color: colors.textSecondary,
-    marginBottom: 12,
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 32,
-  },
-  categoryCard: {
-    width: '48%',
-    backgroundColor: colors.primaryLight,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primaryMid,
-  },
-  catIconContainer: {
-    marginBottom: 8,
-  },
-  categoryCardText: {
-    ...typography.h3,
-    color: colors.primary,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  seeAll: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  ingredientScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  ingredientCircle: {
-    alignItems: 'center',
-    marginRight: 24,
-  },
-  emojiBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
     borderWidth: 1.5,
     borderColor: colors.border,
   },
-  ingredientName: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  historyContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  historyTag: {
+  searchBarFocused: {
+    borderColor: colors.primary,
     backgroundColor: colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  historyText: {
-    ...typography.bodyS,
-    color: colors.textSecondary,
+  input: {
+    flex: 1,
+    ...typography.bodyM,
+    color: colors.textPrimary,
+    paddingVertical: 0,
+  },
+  pillsScroll: {
+    marginHorizontal: -spacing.lg,   // cancela el padding del header para ir de borde a borde
+    marginTop: spacing.lg,
+  },
+  pillsRow: {
+    paddingHorizontal: spacing.lg,
+  },
+  content: {
+    paddingBottom: spacing['4xl'],
   },
 });
