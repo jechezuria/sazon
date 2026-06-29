@@ -9,14 +9,6 @@ import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { useRecipes } from '@/hooks/useRecipes';
 import { useLikes } from '@/hooks/useLikes';
-import { Difficulty } from '@/types';
-
-// ─── Colores del badge según dificultad ───────────────────────────────────────
-const DIFFICULTY_COLOR: Record<Difficulty, { bg: string; text: string }> = {
-  'Fácil':   { bg: '#E8F5E9', text: '#388E3C' },
-  'Medio':   { bg: '#FFF8E1', text: '#F9A825' },
-  'Difícil': { bg: '#FFEBEE', text: '#C62828' },
-};
 
 // ─── Avatar pequeño (28px) ────────────────────────────────────────────────────
 function SmallAvatar({ name }: { name: string }) {
@@ -30,30 +22,6 @@ function SmallAvatar({ name }: { name: string }) {
   return (
     <View style={styles.smallAvatar}>
       <Text style={styles.smallAvatarText}>{initials}</Text>
-    </View>
-  );
-}
-
-// ─── Estrellas de calificación ────────────────────────────────────────────────
-function StarRating({ rating, reviewCount }: { rating: number; reviewCount: number }) {
-  const full  = Math.floor(rating);
-  const half  = rating - full >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
-
-  return (
-    <View style={styles.starsRow}>
-      <View style={styles.starsIcons}>
-        {Array.from({ length: full }).map((_, i) => (
-          <Ionicons key={`f${i}`} name="star" size={14} color={colors.rating} />
-        ))}
-        {half === 1 && (
-          <Ionicons name="star-half" size={14} color={colors.rating} />
-        )}
-        {Array.from({ length: empty }).map((_, i) => (
-          <Ionicons key={`e${i}`} name="star-outline" size={14} color={colors.rating} />
-        ))}
-      </View>
-      <Text style={styles.reviewCount}>{reviewCount} reseñas</Text>
     </View>
   );
 }
@@ -106,8 +74,6 @@ export default function RecipeDetailScreen() {
     });
   }
 
-  const diffColor = DIFFICULTY_COLOR[recipe.difficulty];
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 
@@ -142,9 +108,6 @@ export default function RecipeDetailScreen() {
                 color={isLiked(recipe.id) ? colors.error : colors.textPrimary}
               />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.heroBtn} accessibilityLabel="Compartir">
-              <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -152,23 +115,15 @@ export default function RecipeDetailScreen() {
       {/* ── PANEL DE CONTENIDO ── */}
       <View style={styles.panel}>
 
-        {/* ── PASO 2: TÍTULO + BADGE ── */}
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={3}>
-            {recipe.title}
-          </Text>
-          <View style={[styles.badge, { backgroundColor: diffColor.bg }]}>
-            <Text style={[styles.badgeText, { color: diffColor.text }]}>
-              {recipe.difficulty.toUpperCase()}
-            </Text>
-          </View>
-        </View>
+        {/* ── PASO 2: TÍTULO ── */}
+        <Text style={styles.title} numberOfLines={3}>
+          {recipe.title}
+        </Text>
 
-        {/* ── PASO 3: AUTOR + ESTRELLAS ── */}
+        {/* ── PASO 3: AUTOR ── */}
         <View style={styles.authorRow}>
           <SmallAvatar name={recipe.author.name} />
           <Text style={styles.authorName}>{recipe.author.name}</Text>
-          <StarRating rating={recipe.rating} reviewCount={recipe.reviewCount} />
         </View>
 
         {/* ── PASO 4: META CHIPS ── */}
@@ -305,29 +260,13 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // PASO 2 — Título + badge
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
+  // PASO 2 — Título
   title: {
     ...typography.displayL,
     color: colors.textPrimary,
-    flex: 1,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 9999,
-    flexShrink: 0,
-  },
-  badgeText: {
-    ...typography.label,
   },
 
-  // PASO 3 — Autor + estrellas
+  // PASO 3 — Autor
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -350,19 +289,6 @@ const styles = StyleSheet.create({
   authorName: {
     ...typography.bodyS,
     fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  starsIcons: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  reviewCount: {
-    ...typography.caption,
     color: colors.textSecondary,
   },
 

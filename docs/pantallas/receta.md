@@ -25,14 +25,11 @@ ScrollView
 │   └── View (botones)  ← [←]  [♡] [⬆]  (position: absolute)
 │
 └── [PANEL]  View (blanco, borderTopRadius 24, marginTop -24)
-    ├── [PASO 2]  View titleRow
-    │   ├── Text título
-    │   └── View badge [FÁCIL]
+    ├── [PASO 2]  Text título
     │
     ├── [PASO 3]  View authorRow
     │   ├── SmallAvatar
-    │   ├── Text nombre
-    │   └── StarRating (estrellas + reseñas)
+    │   └── Text nombre
     │
     ├── [PASO 4]  View metaRow
     │   ├── MetaChip (⏱ tiempo)
@@ -58,7 +55,7 @@ ScrollView
 | Commit | Qué incluye | Pasos |
 |---|---|---|
 | **commit 1** — hero image with floating buttons | `Image`, `LinearGradient`, botones flotantes con `position: absolute`, panel blanco con `marginTop: -24` | Paso 1 |
-| **commit 2** — info panel (title, author, meta, description) | `DIFFICULTY_COLOR`, `SmallAvatar`, `StarRating`, `MetaChip`, título + badge, autor + estrellas, chips, descripción | Pasos 2–5 |
+| **commit 2** — info panel (title, author, meta, description) | `SmallAvatar`, `MetaChip`, título, autor, chips, descripción | Pasos 2–5 |
 | **commit 3** — tab selector with ingredients and steps | `useState` para tabs y checkboxes, `toggleCheck`, tab bar, lista ingredientes con `React.Fragment`, lista pasos | Pasos 6–7 |
 
 ---
@@ -157,25 +154,6 @@ Importamos solo el tipo `Difficulty` para tipar el objeto `DIFFICULTY_COLOR`.
 
 ## Componentes helper (líneas 14–75)
 
-### `DIFFICULTY_COLOR`
-
-```tsx
-const DIFFICULTY_COLOR: Record<Difficulty, { bg: string; text: string }> = {
-  'Fácil':   { bg: '#E8F5E9', text: '#388E3C' },
-  'Medio':   { bg: '#FFF8E1', text: '#F9A825' },
-  'Difícil': { bg: '#FFEBEE', text: '#C62828' },
-};
-```
-
-`Record<Difficulty, ...>` es un tipo de TypeScript que dice "este objeto tiene exactamente una clave por cada valor del tipo `Difficulty`". Si le faltara `'Difícil'`, TypeScript tiraría error.
-
-Se usa así:
-```tsx
-const diffColor = DIFFICULTY_COLOR[recipe.difficulty];
-// diffColor.bg   → color de fondo del badge
-// diffColor.text → color del texto del badge
-```
-
 ### `SmallAvatar`
 
 ```tsx
@@ -201,27 +179,6 @@ smallAvatar: {
   justifyContent: 'center',
 },
 ```
-
-### `StarRating`
-
-```tsx
-function StarRating({ rating, reviewCount }: { rating: number; reviewCount: number }) {
-  const full  = Math.floor(rating);        // 4.8 → 4 estrellas llenas
-  const half  = rating - full >= 0.5 ? 1 : 0;  // 0.8 >= 0.5 → 1 media estrella
-  const empty = 5 - full - half;           // 5 - 4 - 1 = 0 estrellas vacías
-  ...
-}
-```
-
-`Array.from({ length: N })` crea un array de N elementos vacíos solo para poder usar `.map()`:
-```tsx
-Array.from({ length: full }).map((_, i) => (
-  <Ionicons key={`f${i}`} name="star" size={14} color={colors.rating} />
-))
-```
-El `_` es convención para "no me interesa el valor del elemento, solo el índice `i`".
-
-La `key` usa un prefijo (`f`, `e`) para que React no confunda estrellas llenas con vacías cuando las lista una al lado de la otra.
 
 ### `MetaChip`
 
@@ -359,54 +316,33 @@ heroBtn: {
 ```
 Dos ternarios: uno para el ícono (relleno/vacío) y otro para el color (rojo/gris). `isLiked` viene del hook `useLikes`.
 
+Solo hay un botón a la derecha (like). El de compartir fue removido — queda un solo botón en `heroBtnGroup`.
+
 ---
 
-### Paso 2 — Título + badge (líneas 148–159)
+### Paso 2 — Título
 
 ```tsx
-<View style={styles.titleRow}>
-  <Text style={styles.title} numberOfLines={3}>{recipe.title}</Text>
-  <View style={[styles.badge, { backgroundColor: diffColor.bg }]}>
-    <Text style={[styles.badgeText, { color: diffColor.text }]}>
-      {recipe.difficulty.toUpperCase()}
-    </Text>
-  </View>
-</View>
+<Text style={styles.title} numberOfLines={3}>
+  {recipe.title}
+</Text>
 ```
 
 ```ts
-titleRow: {
-  flexDirection: 'row',
-  alignItems: 'flex-start',    // alinea arriba, no al centro
-  justifyContent: 'space-between',
-  gap: 12,
-},
 title: {
   ...typography.displayL,
   color: colors.textPrimary,
-  flex: 1,                     // ocupa el espacio disponible
-},
-badge: {
-  paddingHorizontal: 10,
-  paddingVertical: 4,
-  borderRadius: 9999,          // pill
-  flexShrink: 0,               // nunca se achica, aunque el título sea largo
 },
 ```
 
-`alignItems: 'flex-start'` en vez de `'center'`: si el título ocupa 3 líneas, queremos que el badge quede alineado arriba, no al medio del bloque de texto.
-
-`flexShrink: 0` en el badge: por defecto los hijos de un `flexDirection: 'row'` pueden encogerse para caber. Con `flexShrink: 0` el badge siempre tiene su tamaño natural y el título es el que cede espacio.
-
 ---
 
-### Paso 3 — Autor + estrellas (líneas 161–165)
+### Paso 3 — Autor
 
 ```tsx
 <View style={styles.authorRow}>
   <SmallAvatar name={recipe.author.name} />
   <Text style={styles.authorName}>{recipe.author.name}</Text>
-  <StarRating rating={recipe.rating} reviewCount={recipe.reviewCount} />
 </View>
 ```
 
@@ -418,8 +354,6 @@ authorRow: {
   marginTop: 12,
 },
 ```
-
-Sin `flex: 1` en ningún hijo porque queremos que cada elemento ocupe solo lo que necesita y queden pegados uno al lado del otro.
 
 ---
 
@@ -612,13 +546,10 @@ stepText: {
 | `LinearGradient` | Hero | Degradado de `transparent` a oscuro para legibilidad |
 | `position: 'absolute'` | Gradiente y botones | Superponer sobre la imagen |
 | `insets.top + 8` | Botones hero | Respetar el notch en cualquier dispositivo |
-| `Record<Difficulty, ...>` | `DIFFICULTY_COLOR` | Objeto tipeado con todas las claves del tipo |
-| `Array.from({ length: N }).map(...)` | Estrellas | Crear N elementos sin array de datos |
-| `key` con prefijo (`f${i}`, `e${i}`) | Estrellas | Evitar colisión de keys en listas del mismo render |
 | `React.Fragment` con `key` | Ingredientes | Wrapper invisible para listas con múltiples nodos por ítem |
 | `index < arr.length - 1` | Separador ingredientes | Separador entre ítems, no después del último |
 | `String(recipe.servings)` | MetaChip | Convertir número a string para prop tipada |
-| `flexShrink: 0` | Badge, stepBadge | Evitar que el elemento se encoja en una fila |
+| `flexShrink: 0` | stepBadge | Evitar que el elemento se encoja en una fila |
 | `tab.charAt(0).toUpperCase() + tab.slice(1)` | Tab labels | Capitalizar string sin librería |
 | `textDecorationLine: 'line-through'` | Ingrediente marcado | Tachar texto |
 | `alignItems: 'flex-start'` | titleRow | Alinear badge arriba cuando el título es multilínea |
