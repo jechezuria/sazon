@@ -18,6 +18,8 @@ const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
 
 const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
 
+const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arroz', 'Queso'];
+
 export default function BuscarScreen() {
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
@@ -79,17 +81,30 @@ export default function BuscarScreen() {
         {/* Búsquedas recientes */}
         <Text style={styles.sectionLabel}>Búsquedas recientes</Text>
         <View style={styles.recentList}>
-          {RECIENTES.map((term, index) => (
+          {RECIENTES.map(term => (
             <Pressable
               key={term}
               onPress={() => setQuery(term)}
               accessibilityRole="button"
-              style={[styles.recentItem, index < RECIENTES.length - 1 && styles.recentItemBorder]}
+              style={styles.recentItem}
             >
               <Feather name="clock" size={16} color={colors.textMuted} />
               <Text style={styles.recentText}>{term}</Text>
               <Feather name="arrow-right" size={16} color={colors.textMuted} />
             </Pressable>
+          ))}
+        </View>
+
+        {/* Buscar por ingrediente */}
+        <Text style={[styles.sectionLabel, styles.sectionLabelTop]}>Buscar por ingrediente</Text>
+        <View style={styles.ingredientesWrap}>
+          {INGREDIENTES.map(ing => (
+            <CategoryPill
+              key={ing}
+              label={ing}
+              active={query === ing}
+              onPress={() => setQuery(query === ing ? '' : ing)}
+            />
           ))}
         </View>
 
@@ -160,24 +175,30 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   recentList: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
+    gap: spacing.sm,
   },
   recentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-  },
-  recentItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   recentText: {
     ...typography.bodyM,
     color: colors.textPrimary,
     flex: 1,
+  },
+  sectionLabelTop: {
+    marginTop: spacing.xl,
+  },
+  ingredientesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
 });

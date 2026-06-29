@@ -430,6 +430,39 @@ recentList: {
 
 ---
 
+### Paso 4: Buscar por ingrediente
+
+```tsx
+const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arroz', 'Queso'];
+```
+> Sin emojis — la decisión de diseño es que las pills de texto solas se ven más prolijas y profesionales. El componente `CategoryPill` tiene `emoji` como prop opcional, así que simplemente no se pasa.
+
+```tsx
+<CategoryPill
+  active={query === ing}
+  onPress={() => setQuery(ing)}
+/>
+```
+> Mismo componente que las categorías del Home y los filtros de esta pantalla, usado por tercera vez sin modificarlo. `active` se activa cuando el texto del input coincide exactamente con el ingrediente — si el usuario escribe "Pollo" a mano o toca la pill, la pill queda resaltada.
+> `onPress` hace lo mismo que las búsquedas recientes: copia el label al estado `query`.
+
+**`flexWrap` vs `ScrollView horizontal`**
+
+```tsx
+// Scroll horizontal — los items van en una sola fila infinita
+<ScrollView horizontal>
+  <CategoryPill /> <CategoryPill /> ...
+</ScrollView>
+
+// Wrap — los items se acomodan en filas según el espacio disponible
+<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+  <CategoryPill /> <CategoryPill /> ...
+</View>
+```
+> Con `ScrollView horizontal` el usuario tiene que scrollear para ver todos los ingredientes. Con `flexWrap` todos son visibles de una sola vez, distribuidos en filas. Para una lista corta de ingredientes predefinidos, `flexWrap` es mejor UX porque no requiere descubrimiento.
+
+---
+
 ## Conceptos clave de React Native
 
 ### Flexbox en React Native
