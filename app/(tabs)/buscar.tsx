@@ -91,8 +91,126 @@ export default function BuscarScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  center:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title:     { ...typography.displayL, color: colors.textPrimary },
-  sub:       { ...typography.bodyM, color: colors.textSecondary, marginTop: 8 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    backgroundColor: colors.surface,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    // Sombra sutil para darle profundidad
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerTitle: {
+    ...typography.displayL,
+    color: colors.textPrimary,
+    marginBottom: 16,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 50,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    ...typography.bodyM,
+    color: colors.textPrimary,
+  },
+  scrollBody: {
+    padding: 20,
+    paddingBottom: 100,
+  },
+  sectionLabel: {
+    ...typography.label,
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 32,
+  },
+  categoryCard: {
+    width: '48%',
+    backgroundColor: colors.primaryLight,
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+  },
+  catIconContainer: {
+    marginBottom: 8,
+  },
+  categoryCardText: {
+    ...typography.h3,
+    color: colors.primary,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  seeAll: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  ingredientScroll: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    marginBottom: 32,
+  },
+  ingredientCircle: {
+    alignItems: 'center',
+    marginRight: 24,
+  },
+  emojiBg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  ingredientName: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  historyContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  historyTag: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  historyText: {
+    ...typography.bodyS,
+    color: colors.textSecondary,
+  },
 });
