@@ -523,24 +523,49 @@ ingredientSep: {
 
 ---
 
-### Paso 7B — Lista de pasos (líneas 215–229)
+### Paso 7B — Lista de pasos
 
+**Qué es:** lista de pasos presionables. Sin marcar: círculo transparente con número. Marcado: verde con checkmark y texto tachado. Mismo patrón visual que los ingredientes.
+
+**Estado:**
 ```tsx
-{activeTab === 'pasos' && (
-  <View style={styles.tabContent}>
-    {recipe.steps.map((step) => (
-      <View key={step.id} style={styles.stepRow}>
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepNumber}>{step.order}</Text>
-        </View>
-        <Text style={styles.stepText}>{step.description}</Text>
-      </View>
-    ))}
-  </View>
-)}
+const [checkedSteps, setCheckedSteps] = useState<Set<string>>(new Set());
+
+function toggleStep(stepId: string) {
+  setCheckedSteps((prev) => {
+    const next = new Set(prev);
+    next.has(stepId) ? next.delete(stepId) : next.add(stepId);
+    return next;
+  });
+}
 ```
 
-Sin estado — solo renderiza. No necesita `React.Fragment` porque cada step tiene solo un elemento raíz (`View`).
+Mismo patrón que `toggleCheck` — copia el Set, muta la copia, devuelve la copia.
+
+**JSX:**
+```tsx
+{recipe.steps.map((step) => (
+  <TouchableOpacity
+    key={step.id}
+    style={styles.stepRow}
+    onPress={() => toggleStep(step.id)}
+    activeOpacity={0.7}
+  >
+    <View style={[styles.stepBadge, checkedSteps.has(step.id) && styles.stepBadgeChecked]}>
+      {checkedSteps.has(step.id) ? (
+        <Ionicons name="checkmark" size={14} color={colors.surface} />
+      ) : (
+        <Text style={styles.stepNumber}>{step.order}</Text>
+      )}
+    </View>
+    <Text style={[styles.stepText, checkedSteps.has(step.id) && styles.stepTextChecked]}>
+      {step.description}
+    </Text>
+  </TouchableOpacity>
+))}
+```
+
+No necesita `React.Fragment` porque cada paso tiene un solo elemento raíz (`TouchableOpacity`). Tampoco tiene separador — el `marginBottom: 20` en `stepRow` comunica la secuencia.
 
 ```ts
 stepRow: {
@@ -551,23 +576,35 @@ stepRow: {
 stepBadge: {
   width: 32,
   height: 32,
-  borderRadius: 16,            // círculo
-  backgroundColor: colors.primary,
+  borderRadius: 16,
+  borderWidth: 1.5,
+  borderColor: colors.border,
+  backgroundColor: 'transparent',
   alignItems: 'center',
   justifyContent: 'center',
-  flexShrink: 0,               // no se achica si el texto del paso es muy largo
+  flexShrink: 0,
+},
+stepBadgeChecked: {
+  backgroundColor: colors.success,
+  borderColor: colors.success,
 },
 stepNumber: {
   ...typography.buttonSm,
-  color: colors.surface,       // blanco sobre naranja
+  color: colors.textMuted,       // gris sobre transparente
 },
 stepText: {
   ...typography.bodyM,
   color: colors.textSecondary,
-  flex: 1,                     // ocupa el espacio restante
+  flex: 1,
   lineHeight: 22,
 },
+stepTextChecked: {
+  textDecorationLine: 'line-through',
+  color: colors.textMuted,
+},
 ```
+
+> **Diferencia con la versión anterior:** el badge era naranja sólido (`colors.primary`). Ahora es transparente con borde gris, igual que los ingredientes — el color verde llega solo al marcar.
 
 ---
 

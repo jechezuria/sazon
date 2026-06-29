@@ -51,8 +51,9 @@ export default function RecipeDetailScreen() {
   const { getById }             = useRecipes();
   const { isLiked, toggleLike } = useLikes();
 
-  const [activeTab, setActiveTab] = useState<Tab>('ingredientes');
-  const [checked,   setChecked]   = useState<Set<string>>(new Set());
+  const [activeTab,     setActiveTab]     = useState<Tab>('ingredientes');
+  const [checked,       setChecked]       = useState<Set<string>>(new Set());
+  const [checkedSteps,  setCheckedSteps]  = useState<Set<string>>(new Set());
 
   const recipe = getById(id as string);
 
@@ -70,6 +71,14 @@ export default function RecipeDetailScreen() {
     setChecked((prev) => {
       const next = new Set(prev);
       next.has(ingredientId) ? next.delete(ingredientId) : next.add(ingredientId);
+      return next;
+    });
+  }
+
+  function toggleStep(stepId: string) {
+    setCheckedSteps((prev) => {
+      const next = new Set(prev);
+      next.has(stepId) ? next.delete(stepId) : next.add(stepId);
       return next;
     });
   }
@@ -193,12 +202,29 @@ export default function RecipeDetailScreen() {
         {activeTab === 'pasos' && (
           <View style={styles.tabContent}>
             {recipe.steps.map((step) => (
-              <View key={step.id} style={styles.stepRow}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepNumber}>{step.order}</Text>
+              <TouchableOpacity
+                key={step.id}
+                style={styles.stepRow}
+                onPress={() => toggleStep(step.id)}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  styles.stepBadge,
+                  checkedSteps.has(step.id) && styles.stepBadgeChecked,
+                ]}>
+                  {checkedSteps.has(step.id) ? (
+                    <Ionicons name="checkmark" size={14} color={colors.surface} />
+                  ) : (
+                    <Text style={styles.stepNumber}>{step.order}</Text>
+                  )}
                 </View>
-                <Text style={styles.stepText}>{step.description}</Text>
-              </View>
+                <Text style={[
+                  styles.stepText,
+                  checkedSteps.has(step.id) && styles.stepTextChecked,
+                ]}>
+                  {step.description}
+                </Text>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -419,19 +445,29 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.primary,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
+  stepBadgeChecked: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
   stepNumber: {
     ...typography.buttonSm,
-    color: colors.surface,
+    color: colors.textMuted,
   },
   stepText: {
     ...typography.bodyM,
     color: colors.textSecondary,
     flex: 1,
     lineHeight: 22,
+  },
+  stepTextChecked: {
+    textDecorationLine: 'line-through',
+    color: colors.textMuted,
   },
 });
