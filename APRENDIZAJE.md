@@ -377,6 +377,59 @@ header: {
 
 ---
 
+### Paso 2: Pills de filtro
+
+```tsx
+const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
+const [filtroActivo, setFiltroActivo] = useState('Todo');
+```
+> Mismo patrón que las categorías del Home — array de strings + estado local. Se reutiliza exactamente el mismo componente `CategoryPill` sin modificarlo.
+
+**¿Por qué las pills van dentro del `header` y no en el `ScrollView`?**
+Porque en el diseño el fondo blanco abarca título + buscador + pills. Si las pills estuvieran en el scroll, quedarían sobre el fondo crema (`colors.bg`). Al ponerlas dentro del mismo `View` del header, heredan su `backgroundColor: colors.surface`.
+
+```tsx
+pillsScroll: {
+  marginHorizontal: -spacing.lg,  // -16pt
+  marginTop: spacing.lg,
+},
+pillsRow: {
+  paddingHorizontal: spacing.lg,  // +16pt
+},
+```
+> El header tiene `paddingHorizontal: 16`. Sin el margen negativo, las pills arrancan con 16pt de espacio a la izquierda y la primera pill quedaría desplazada. El `-16` cancela ese padding y el `paddingHorizontal` del `contentContainerStyle` lo repone — el resultado es que las pills arrancan desde el mismo borde que el título y la barra.
+
+---
+
+### Paso 3: Búsquedas recientes
+
+```tsx
+const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
+```
+> Por ahora son datos fijos (mock). En una app real esto vendría de `AsyncStorage` o similar — se guardaría cada vez que el usuario ejecuta una búsqueda.
+
+```tsx
+<Pressable onPress={() => setQuery(term)} ...>
+```
+> Al tocar un resultado reciente, se copia el texto al estado `query`. Esto simula que el usuario escribió ese texto — en el Paso 5 (resultados) ese `query` va a filtrar las recetas automáticamente.
+
+```tsx
+// Separador solo entre ítems, no después del último
+style={[styles.recentItem, index < RECIENTES.length - 1 && styles.recentItemBorder]}
+```
+> `index < RECIENTES.length - 1` es `true` para todos los ítems excepto el último. Así el borde separador aparece entre ítems pero no debajo del último, evitando una línea flotante al final de la card.
+
+```tsx
+recentList: {
+  backgroundColor: colors.surface,
+  borderRadius: radius.lg,
+  overflow: 'hidden',   // ← importante
+},
+```
+> `overflow: 'hidden'` hace que los bordes redondeados de la card recorten los ítems internos. Sin esto, el primer y último ítem no respetarían el `borderRadius` del contenedor y los bordes de la card se verían cuadrados en las esquinas.
+
+---
+
 ## Conceptos clave de React Native
 
 ### Flexbox en React Native

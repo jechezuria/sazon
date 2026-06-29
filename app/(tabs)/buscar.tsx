@@ -16,6 +16,8 @@ import { CategoryPill } from '@/components/molecules/CategoryPill';
 
 const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
 
+const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
+
 export default function BuscarScreen() {
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
@@ -73,7 +75,24 @@ export default function BuscarScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* El resto de las secciones van acá */}
+
+        {/* Búsquedas recientes */}
+        <Text style={styles.sectionLabel}>Búsquedas recientes</Text>
+        <View style={styles.recentList}>
+          {RECIENTES.map((term, index) => (
+            <Pressable
+              key={term}
+              onPress={() => setQuery(term)}
+              accessibilityRole="button"
+              style={[styles.recentItem, index < RECIENTES.length - 1 && styles.recentItemBorder]}
+            >
+              <Feather name="clock" size={16} color={colors.textMuted} />
+              <Text style={styles.recentText}>{term}</Text>
+              <Feather name="arrow-right" size={16} color={colors.textMuted} />
+            </Pressable>
+          ))}
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -131,6 +150,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   content: {
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing['4xl'],
+  },
+  sectionLabel: {
+    ...typography.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  recentList: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  recentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  recentItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  recentText: {
+    ...typography.bodyM,
+    color: colors.textPrimary,
+    flex: 1,
   },
 });
