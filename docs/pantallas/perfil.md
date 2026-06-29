@@ -393,6 +393,331 @@ profileInfo: {
 
 ---
 
+### Paso 3 — Sección "Mi cuenta" (líneas 178–192)
+
+**Posición:** segundo elemento dentro del `ScrollView`, después de la card de perfil.
+
+```tsx
+<Section title="Mi cuenta">
+  <MenuItem
+    icon="person-outline"
+    label="Editar perfil"
+    onPress={() => {}}
+  />
+  <Separator />
+  <MenuItem
+    icon="lock-closed-outline"
+    label="Cambiar contraseña"
+    onPress={() => {}}
+  />
+</Section>
+```
+
+---
+
+#### Cómo funciona `<Section>`
+
+`Section` es el componente que definimos antes (líneas 91–107). Cuando escribimos:
+
+```tsx
+<Section title="Mi cuenta">
+  ...cosas adentro...
+</Section>
+```
+
+Lo que va entre las etiquetas de apertura y cierre (`<Section>` y `</Section>`) se convierte en la prop `children` dentro del componente. El componente lo renderiza acá:
+
+```tsx
+function Section({ title, children }: SectionProps) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{title}</Text>    {/* "MI CUENTA" */}
+      <View style={styles.menuGroup}>{children}</View>    {/* ← acá entran los MenuItem */}
+    </View>
+  );
+}
+```
+
+Entonces la estructura real que se renderiza en pantalla es:
+
+```
+View [section]
+├── Text "MI CUENTA"            ← sectionLabel (11px, bold, uppercase)
+└── View [menuGroup]            ← card blanca con sombra
+    ├── MenuItem "Editar perfil"
+    ├── Separator               ← línea de 1px
+    └── MenuItem "Cambiar contraseña"
+```
+
+---
+
+#### Los dos `MenuItem` de esta sección
+
+**Ítem 1:**
+```tsx
+<MenuItem
+  icon="person-outline"
+  label="Editar perfil"
+  onPress={() => {}}
+/>
+```
+
+- `icon="person-outline"` → nombre del ícono en Ionicons. El `-outline` indica versión con trazo (no rellena).
+- `label="Editar perfil"` → el texto visible.
+- `onPress={() => {}}` → función vacía por ahora. Es un **placeholder**: el botón existe visualmente pero no hace nada hasta que conectemos la navegación. Es mejor que no poner `onPress` porque así no hay error de TypeScript.
+
+**Ítem 2:**
+```tsx
+<MenuItem
+  icon="lock-closed-outline"
+  label="Cambiar contraseña"
+  onPress={() => {}}
+/>
+```
+
+Mismo patrón. No tiene `danger` ni `rightLabel` → usa los valores default: `danger = false` (naranja) y muestra el chevron.
+
+---
+
+#### El `<Separator />` entre los dos ítems
+
+```tsx
+<Separator />
+```
+
+Este componente solo renderiza un `View` de 1px de alto:
+
+```tsx
+function Separator() {
+  return <View style={styles.separator} />;
+}
+```
+
+```ts
+separator: {
+  height: 1,
+  backgroundColor: colors.border,  // '#F0EDE8'
+  marginLeft: 60,  // 16px padding + 32px ícono + 12px gap = 60px
+},
+```
+
+El `marginLeft: 60` hace que la línea empiece después del ícono, igualando la alineación del texto. Si fuera `marginLeft: 0` la línea cruzaría también el ícono, que se ve raro.
+
+```
+[  ícono  ] texto del ítem 1   >
+            ─────────────────    ← el separador empieza acá (a 60px)
+[  ícono  ] texto del ítem 2   >
+```
+
+---
+
+#### ¿Por qué los ítems no tienen `<View>` o `<Text>` directamente?
+
+Porque encapsulamos esa lógica en el componente `MenuItem`. Si mañana queremos cambiar la altura de todos los ítems de menú, lo cambiamos en un solo lugar (`styles.menuItem`) y se aplica en toda la app. Eso se llama **encapsulación** — el componente esconde sus detalles internos.
+
+---
+
+#### Prop shorthand: `danger` vs `danger={true}`
+
+En el paso 5 (Cerrar sesión) vas a ver:
+
+```tsx
+<MenuItem danger ... />
+```
+
+En React, cuando una prop booleana está presente sin valor, equivale a `danger={true}`. Son exactamente lo mismo:
+
+```tsx
+<MenuItem danger />          // ← forma corta
+<MenuItem danger={true} />   // ← forma larga
+```
+
+En esta sección ("Mi cuenta") los `MenuItem` no tienen `danger`, entonces usan el default `danger = false` que definimos en la firma del componente.
+
+---
+
+### Paso 4 — Sección "Contenido" (líneas 194–207)
+
+**Posición:** tercer elemento dentro del `ScrollView`, después de "Mi cuenta".
+
+```tsx
+<Section title="Contenido">
+  <MenuItem
+    icon="bookmark-outline"
+    label="Mis publicaciones"
+    onPress={() => {}}
+  />
+  <Separator />
+  <MenuItem
+    icon="add-circle-outline"
+    label="Crear receta"
+    onPress={() => router.push("/crear/detalles")}
+  />
+</Section>
+```
+
+Es exactamente la misma estructura que "Mi cuenta" — dos `MenuItem` con un `Separator` en el medio. La diferencia está en el segundo ítem:
+
+```tsx
+onPress={() => router.push("/crear/detalles")}
+```
+
+Este ya tiene navegación real. `router.push("/crear/detalles")` lleva a la pantalla `app/crear/detalles.tsx`. El `/` al inicio indica que es una ruta absoluta desde la raíz del proyecto.
+
+**Diferencia con `router.back()`:**
+
+| Función | Qué hace |
+|---|---|
+| `router.back()` | Vuelve a la pantalla anterior (como el botón atrás) |
+| `router.push("/ruta")` | Navega hacia adelante a una nueva pantalla |
+
+---
+
+### Paso 5 — Sección "Sesión" (líneas 209–218)
+
+**Posición:** cuarto y último elemento de contenido dentro del `ScrollView`.
+
+```tsx
+<Section title="Sesión">
+  <MenuItem
+    icon="log-out-outline"
+    label="Cerrar sesión"
+    onPress={handleLogout}
+    danger
+  />
+</Section>
+```
+
+Dos diferencias respecto a los ítems anteriores:
+
+**1. `danger` sin valor**
+```tsx
+danger   // equivale a danger={true}
+```
+El componente `MenuItem` recibe esto y cambia tres cosas:
+- Fondo del ícono: `colors.primaryLight` → `'#FDECEA'` (rojo muy suave)
+- Color del ícono: `colors.primary` → `colors.error`
+- Color del texto: `colors.textPrimary` → `colors.error`
+
+Todo eso pasa dentro del componente con una sola variable:
+```tsx
+const tint = danger ? colors.error : colors.primary;
+```
+
+**2. `onPress={handleLogout}` sin arrow function**
+```tsx
+onPress={handleLogout}       // ← forma directa
+onPress={() => handleLogout()} // ← forma con arrow function (innecesaria acá)
+```
+
+Son equivalentes, pero como `handleLogout` no recibe argumentos, podemos pasarla directamente. La arrow function solo es necesaria cuando querés pasarle parámetros a la función, por ejemplo: `onPress={() => handleLogout(user.id)}`.
+
+**La función `handleLogout` (líneas 113–118):**
+```tsx
+function handleLogout() {
+  Alert.alert(
+    "Cerrar sesión",                           // título del diálogo
+    "¿Estás seguro que querés cerrar sesión?", // mensaje
+    [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Cerrar sesión", style: "destructive", onPress: () => {} },
+    ]
+  );
+}
+```
+
+`Alert.alert` muestra un diálogo nativo del sistema operativo. El tercer argumento es un array de botones. `style: "destructive"` le dice a iOS que lo pinte en rojo automáticamente — no necesitamos estilos de React Native para eso.
+
+---
+
+### Paso 6 — Footer (líneas 220–223)
+
+**Posición:** último elemento dentro del `ScrollView`, después de todas las secciones.
+
+```tsx
+<Text style={styles.footer}>
+  Sazón v1.0 · Hecho con ❤️ para los que cocinan
+</Text>
+```
+
+```ts
+footer: {
+  ...typography.caption,   // 12px, regular
+  color: colors.textMuted, // '#B0ADA8' — gris muy suave
+  textAlign: "center",     // centrado horizontalmente
+  marginTop: 12,           // espacio arriba para separarlo de la última sección
+},
+```
+
+`textAlign: "center"` en React Native funciona igual que en CSS — centra el texto dentro de su contenedor. Como el `Text` hereda el ancho del `ScrollView` (que tiene `paddingHorizontal: 16`), el texto queda centrado en toda la pantalla.
+
+---
+
+### El `StyleSheet.create` y los estilos compartidos (líneas 230–344)
+
+Todos los estilos van en un único objeto al **final del archivo**. Esto es la convención de React Native.
+
+```ts
+const styles = StyleSheet.create({ ... });
+```
+
+**¿Por qué `StyleSheet.create` y no objetos normales?**
+Con objetos normales los estilos se recrean en memoria en cada render. `StyleSheet.create` los registra una sola vez y usa IDs numéricos internamente — es más eficiente.
+
+**Estilos compartidos entre pasos 3, 4 y 5:**
+
+Los tres pasos usan los mismos estilos porque usan el mismo componente `Section`:
+
+```ts
+// Compartido por TODOS los Section (pasos 3, 4 y 5)
+section: {
+  marginBottom: 20,   // espacio entre secciones
+},
+
+sectionLabel: {
+  ...typography.label,   // 11px, 600, UPPERCASE, letterSpacing: 0.8
+  color: colors.textMuted,
+  marginBottom: 8,
+  marginLeft: 4,
+},
+
+menuGroup: {
+  backgroundColor: colors.surface,
+  borderRadius: 16,
+  overflow: "hidden",  // los hijos respetan el borderRadius
+  ...shadows.card,
+},
+```
+
+Y compartido por TODOS los `MenuItem`:
+```ts
+menuItem: {
+  flexDirection: "row",
+  alignItems: "center",
+  height: 52,           // altura fija definida en el design system
+  paddingHorizontal: 16,
+},
+
+menuIconWrap: {
+  width: 32,
+  height: 32,
+  borderRadius: 8,      // cuadrado redondeado (no círculo)
+  alignItems: "center",
+  justifyContent: "center",
+  marginRight: 12,
+},
+
+menuLabel: {
+  ...typography.bodyL,
+  color: colors.textPrimary,
+  flex: 1,  // empuja el chevron al borde derecho
+},
+```
+
+> **Por qué `borderRadius: 8` en el ícono y no `28` (círculo):** el diseño usa cuadrados redondeados para los íconos de menú (estilo iOS Settings), no círculos. El círculo sería `borderRadius: 16` (width/2).
+
+---
+
 ## Resumen de patrones aprendidos
 
 | Patrón | Dónde aparece | Para qué sirve |
@@ -407,3 +732,13 @@ profileInfo: {
 | `...shadows.card` | Cards | Spread de objeto para "aplanar" estilos de sombra |
 | `borderRadius = width / 2` | Avatar | Hacer un círculo perfecto con tamaño conocido |
 | `onPress={() => fn()}` | Todos los botones | Envolver en arrow function para no ejecutar al renderizar |
+| `onPress={() => {}}` | MenuItem placeholder | Función vacía mientras la navegación no está conectada — evita errores de TypeScript |
+| `<Prop />` vs `<Prop={true} />` | `danger` en MenuItem | Son equivalentes; la forma corta es la convención cuando el valor es `true` |
+| `children` prop | Section | Lo que va entre etiquetas de apertura y cierre de un componente |
+| `marginLeft` en Separator | Separator | Alinear la línea con el texto, no con el borde del contenedor |
+| `router.push("/ruta")` | Crear receta | Navegar hacia adelante a una nueva pantalla |
+| `router.back()` | Header | Volver a la pantalla anterior |
+| `onPress={fn}` vs `onPress={() => fn()}` | Cerrar sesión | Sin parámetros: pasar directo. Con parámetros: envolver en arrow function |
+| `style: "destructive"` en Alert | handleLogout | iOS pinta el botón en rojo automáticamente sin CSS extra |
+| `StyleSheet.create` | Estilos | Registra los estilos una sola vez en memoria, más eficiente que objetos inline |
+| `textAlign: "center"` | Footer | Centra el texto dentro del ancho de su contenedor |
