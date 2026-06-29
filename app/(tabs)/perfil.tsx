@@ -1,7 +1,19 @@
+import { MOCK_USER } from "@/data/mockData";
 import { colors } from "@/theme/colors";
+import { shadows } from "@/theme/shadows";
+import { typography } from "@/theme/typography";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // ─── Avatar con iniciales ─────────────────────────────────────────────────────
 function Avatar({ name }: { name: string }) {
