@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -74,12 +74,17 @@ function MetaChip({ icon, value, label }: {
 }
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
+type Tab = 'ingredientes' | 'pasos';
+
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const { getById }             = useRecipes();
   const { isLiked, toggleLike } = useLikes();
+
+  const [activeTab, setActiveTab] = useState<Tab>('ingredientes');
+  const [checked,   setChecked]   = useState<Set<string>>(new Set());
 
   const recipe = getById(id as string);
 
@@ -91,6 +96,14 @@ export default function RecipeDetailScreen() {
         </Text>
       </View>
     );
+  }
+
+  function toggleCheck(ingredientId: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(ingredientId) ? next.delete(ingredientId) : next.add(ingredientId);
+      return next;
+    });
   }
 
   const diffColor = DIFFICULTY_COLOR[recipe.difficulty];
@@ -166,6 +179,69 @@ export default function RecipeDetailScreen() {
 
         {/* ── PASO 5: DESCRIPCIÓN ── */}
         <Text style={styles.description}>{recipe.description}</Text>
+
+        {/* ── PASO 6: TAB SELECTOR ── */}
+        <View style={styles.tabBar}>
+          {(['ingredientes', 'pasos'] as Tab[]).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── PASO 7A: LISTA DE INGREDIENTES ── */}
+        {activeTab === 'ingredientes' && (
+          <View style={styles.tabContent}>
+            <Text style={styles.tabCount}>
+              {recipe.ingredients.length} ingredientes
+            </Text>
+            {recipe.ingredients.map((ing, index) => (
+              <React.Fragment key={ing.id}>
+                <TouchableOpacity
+                  style={styles.ingredientRow}
+                  onPress={() => toggleCheck(ing.id)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={checked.has(ing.id) ? 'radio-button-on' : 'radio-button-off'}
+                    size={20}
+                    color={checked.has(ing.id) ? colors.primary : colors.textMuted}
+                  />
+                  <Text style={[
+                    styles.ingredientName,
+                    checked.has(ing.id) && styles.ingredientChecked,
+                  ]}>
+                    {ing.name}
+                  </Text>
+                  <Text style={styles.ingredientAmount}>{ing.amount}</Text>
+                </TouchableOpacity>
+                {index < recipe.ingredients.length - 1 && (
+                  <View style={styles.ingredientSep} />
+                )}
+              </React.Fragment>
+            ))}
+          </View>
+        )}
+
+        {/* ── PASO 7B: LISTA DE PASOS ── */}
+        {activeTab === 'pasos' && (
+          <View style={styles.tabContent}>
+            {recipe.steps.map((step) => (
+              <View key={step.id} style={styles.stepRow}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepNumber}>{step.order}</Text>
+                </View>
+                <Text style={styles.stepText}>{step.description}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
       </View>
     </ScrollView>
@@ -320,5 +396,91 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
     marginTop: 16,
+  },
+
+  // PASO 6 — Tab selector
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginTop: 20,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  tabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
+  },
+  tabText: {
+    ...typography.h3,
+    color: colors.textSecondary,
+  },
+  tabTextActive: {
+    color: colors.primary,
+  },
+
+  // PASO 7 — Contenido tabs
+  tabContent: {
+    marginTop: 16,
+  },
+  tabCount: {
+    ...typography.label,
+    color: colors.textMuted,
+    marginBottom: 12,
+  },
+
+  // 7A — Ingredientes
+  ingredientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  ingredientName: {
+    ...typography.bodyM,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  ingredientChecked: {
+    textDecorationLine: 'line-through',
+    color: colors.textMuted,
+  },
+  ingredientAmount: {
+    ...typography.bodyS,
+    color: colors.textSecondary,
+  },
+  ingredientSep: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginLeft: 32,
+  },
+
+  // 7B — Pasos
+  stepRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 20,
+  },
+  stepBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  stepNumber: {
+    ...typography.buttonSm,
+    color: colors.surface,
+  },
+  stepText: {
+    ...typography.bodyM,
+    color: colors.textSecondary,
+    flex: 1,
+    lineHeight: 22,
   },
 });

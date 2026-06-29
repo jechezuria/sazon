@@ -5,10 +5,10 @@ Pantalla dinámica que muestra el detalle completo de una receta. La `[id]` en e
 **Referencia visual:** imagen de la app "Dishly" (Recipe Detail screen)  
 **Design system:** `sazon-design-system.md` → sección 6 (Pantallas: Detalle de Receta)
 
-> **Diferencias entre la imagen de referencia y lo que vamos a construir:**
-> | Imagen (Dishly) | Sazón (nuestro) |
+> **Diferencias entre la imagen de referencia y lo que construimos:**
+> | Imagen (Dishly) | Sazón |
 > |---|---|
-> | 3 botones flotantes: ← ♡ 🔖 ⬆ | 3 botones: ← ♡ ⬆ (sin bookmark) |
+> | 4 botones: ← ♡ 🔖 ⬆ | 3 botones: ← ♡ ⬆ (sin bookmark) |
 > | 3 MetaChips: tiempo, porciones, calorías | 2 MetaChips: tiempo, porciones (sin calorías) |
 > | 3 tabs: Ingredients, Steps, Nutrition | 2 tabs: Ingredientes, Pasos (sin Nutrición) |
 
@@ -17,288 +17,475 @@ Pantalla dinámica que muestra el detalle completo de una receta. La `[id]` en e
 ## Estructura visual
 
 ```
-┌─────────────────────────────┐
-│                             │
-│    [PASO 1]  HERO IMAGE     │  ← imagen full-width, aspect ratio 4:3
-│    foto de la receta        │
-│                             │
-│  [←]              [♡] [⬆]  │  ← botones flotantes sobre la imagen
-│                             │
-├──────────────────────────── ┤  ← panel blanco con borderRadius arriba
-│                             │
-│  [PASO 2]  TÍTULO + BADGE   │  "Panqueques de Avena"   [FÁCIL]
-│  [PASO 3]  AUTOR + STARS    │  avatar · "Sofia Chen" ★★★★☆ 342 reseñas
-│                             │
-│  [PASO 4]  META CHIPS       │  [ ⏱ 20 min ] [ 👥 4 porciones ]
-│                             │
-│  [PASO 5]  DESCRIPCIÓN      │  texto descriptivo del plato
-│                             │
-│  [PASO 6]  TAB SELECTOR     │  [ Ingredientes ]  [ Pasos ]
-│  ─────────────────────────  │
-│  [PASO 7A] LISTA INGREDIEN. │  ○ Avena          1 taza
-│            (tab activo)     │  ○ Banana madura   1 grande
-│                             │  ○ Huevos          2 unidades
-│  [PASO 7B] LISTA PASOS      │  ① Licuá la avena...
-│            (tab inactivo)   │  ② Dejá reposar...
-└─────────────────────────────┘
+ScrollView
+│
+├── [PASO 1]  View (hero container)
+│   ├── Image           ← foto full-width, aspect ratio 4:3
+│   ├── LinearGradient  ← degradado oscuro en la mitad inferior (position: absolute)
+│   └── View (botones)  ← [←]  [♡] [⬆]  (position: absolute)
+│
+└── [PANEL]  View (blanco, borderTopRadius 24, marginTop -24)
+    ├── [PASO 2]  View titleRow
+    │   ├── Text título
+    │   └── View badge [FÁCIL]
+    │
+    ├── [PASO 3]  View authorRow
+    │   ├── SmallAvatar
+    │   ├── Text nombre
+    │   └── StarRating (estrellas + reseñas)
+    │
+    ├── [PASO 4]  View metaRow
+    │   ├── MetaChip (⏱ tiempo)
+    │   └── MetaChip (👥 porciones)
+    │
+    ├── [PASO 5]  Text descripción
+    │
+    ├── [PASO 6]  View tabBar
+    │   ├── TouchableOpacity "Ingredientes"
+    │   └── TouchableOpacity "Pasos"
+    │
+    ├── [PASO 7A] View tabContent — ingredientes (si tab activo)
+    │   └── ingredientes.map → TouchableOpacity [radio] [nombre] [cantidad]
+    │
+    └── [PASO 7B] View tabContent — pasos (si tab activo)
+        └── steps.map → View [badge #] [texto]
 ```
 
 ---
 
-## Conceptos nuevos en esta pantalla
+## Commits
 
-Antes de arrancar con los pasos, hay 3 conceptos que no aparecieron en la pantalla de Perfil:
+| Commit | Qué incluye | Pasos |
+|---|---|---|
+| **commit 1** — hero image with floating buttons | `Image`, `LinearGradient`, botones flotantes con `position: absolute`, panel blanco con `marginTop: -24` | Paso 1 |
+| **commit 2** — info panel (title, author, meta, description) | `DIFFICULTY_COLOR`, `SmallAvatar`, `StarRating`, `MetaChip`, título + badge, autor + estrellas, chips, descripción | Pasos 2–5 |
+| **commit 3** — tab selector with ingredients and steps | `useState` para tabs y checkboxes, `toggleCheck`, tab bar, lista ingredientes con `React.Fragment`, lista pasos | Pasos 6–7 |
 
-### 1. Ruta dinámica con `[id]`
+---
 
-El archivo se llama `[id].tsx` (con corchetes). Eso le dice a Expo Router que ese segmento de la URL es un **parámetro variable**. Ejemplos:
+## Conceptos nuevos (no vistos en Perfil)
+
+### 1. Ruta dinámica `[id].tsx`
+
+El archivo se llama `[id].tsx` con corchetes. Expo Router entiende que ese segmento es variable:
 
 ```
 /recipe/recipe-1  →  id = "recipe-1"
 /recipe/recipe-3  →  id = "recipe-3"
 ```
 
-Para leer ese parámetro dentro del componente:
+Para leer ese valor dentro del componente:
 ```tsx
 const { id } = useLocalSearchParams<{ id: string }>();
 ```
-El `<{ id: string }>` es TypeScript diciéndole "el parámetro `id` va a ser un string".
+El tipo genérico `<{ id: string }>` le dice a TypeScript que el parámetro `id` va a ser string.
 
-### 2. Scroll sobre imagen fija (hero + contenido)
+### 2. `marginTop: -24` para el panel sobre la imagen
 
-El hero (imagen) es fijo en la parte superior. El contenido de abajo scrollea. La técnica es usar un `ScrollView` que **arranca transparente sobre la imagen** y el panel blanco flota encima con `borderTopLeftRadius` y `borderTopRightRadius`.
+El panel blanco "sube" 24px sobre el borde inferior de la imagen:
+```ts
+panel: {
+  marginTop: -24,              // valor negativo = sube sobre el elemento anterior
+  borderTopLeftRadius: 24,     // esquinas redondeadas solo arriba
+  borderTopRightRadius: 24,
+}
+```
+El efecto visual es que el panel parece flotar encima de la foto.
 
-Hay dos formas de hacerlo:
-- **Opción A:** `ScrollView` con el hero como primer elemento (más simple, el hero scrollea con el contenido)
-- **Opción B:** Imagen fija + `ScrollView` absoluto encima (el hero queda fijo mientras el contenido sube)
+### 3. `useState` — estado local
 
-Vamos a usar la **Opción A** por simplicidad — el hero scrollea con el contenido.
+`useState` guarda un valor que puede cambiar. Cuando cambia, React re-renderiza el componente:
+```tsx
+const [activeTab, setActiveTab] = useState<Tab>('ingredientes');
+// activeTab  → el valor actual
+// setActiveTab → función para cambiarlo
+// 'ingredientes' → valor inicial
+```
 
-### 3. Estado local para el tab activo
+### 4. `Set` de JavaScript
 
-La pantalla tiene un tab selector (Ingredientes / Pasos). Necesitamos recordar qué tab está activo:
+Estructura que guarda valores únicos. Ideal para IDs de ítems marcados:
+```tsx
+const [checked, setChecked] = useState<Set<string>>(new Set());
+// new Set()         → conjunto vacío
+// checked.has(id)   → ¿está marcado?
+// next.add(id)      → marcar
+// next.delete(id)   → desmarcar
+```
+
+---
+
+## Imports (línea 1–13)
 
 ```tsx
-const [activeTab, setActiveTab] = useState<'ingredientes' | 'pasos'>('ingredientes');
+import React, { useState } from 'react';
+```
+`useState` se importa de `react` directamente — no de `react-native`.
+
+```tsx
+import { Image } from 'expo-image';
+```
+Versión optimizada de `Image` con caché automático. Viene de `expo-image`, no de `react-native`.
+
+```tsx
+import { LinearGradient } from 'expo-linear-gradient';
+```
+Renderiza un degradado de colores. Lo usamos para oscurecer la parte inferior de la imagen del hero.
+
+```tsx
+import { useLocalSearchParams, useRouter } from 'expo-router';
+```
+- `useLocalSearchParams` → lee el `[id]` de la URL
+- `useRouter` → para `router.back()` al presionar el botón volver
+
+```tsx
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+```
+Devuelve los insets del dispositivo (tamaño del notch, barra home). Lo usamos para posicionar los botones del hero debajo del notch:
+```tsx
+const insets = useSafeAreaInsets();
+// insets.top → altura del notch en píxeles
+<View style={{ top: insets.top + 8 }} />
 ```
 
-`useState` es un hook de React que guarda un valor que puede cambiar. Cuando cambia, React re-renderiza el componente automáticamente.
+```tsx
+import { Difficulty } from '@/types';
+```
+Importamos solo el tipo `Difficulty` para tipar el objeto `DIFFICULTY_COLOR`.
 
 ---
 
-## Paso a paso
+## Componentes helper (líneas 14–75)
 
----
+### `DIFFICULTY_COLOR`
 
-### Paso 1 — Hero con botones flotantes
-
-**Archivo:** `app/recipe/[id].tsx`  
-**Qué es:** imagen de la receta a pantalla completa (aspect ratio 4:3) con 3 botones superpuestos.
-
-```
-┌─────────────────────────────┐
-│  foto de la receta          │  ← Image, aspect ratio 4:3
-│  con gradiente oscuro abajo │  ← LinearGradient encima
-│                             │
-│  [←]              [♡] [⬆]  │  ← posición absoluta sobre la imagen
-└─────────────────────────────┘
+```tsx
+const DIFFICULTY_COLOR: Record<Difficulty, { bg: string; text: string }> = {
+  'Fácil':   { bg: '#E8F5E9', text: '#388E3C' },
+  'Medio':   { bg: '#FFF8E1', text: '#F9A825' },
+  'Difícil': { bg: '#FFEBEE', text: '#C62828' },
+};
 ```
 
-**Componentes que se usan:**
-- `Image` de `expo-image` → para mostrar la foto con caché
-- `LinearGradient` de `expo-linear-gradient` → el degradado oscuro de abajo
-- `TouchableOpacity` x3 → los 3 botones (circular, fondo blanco semitransparente)
-- `Ionicons` → íconos de los botones
+`Record<Difficulty, ...>` es un tipo de TypeScript que dice "este objeto tiene exactamente una clave por cada valor del tipo `Difficulty`". Si le faltara `'Difícil'`, TypeScript tiraría error.
 
-**Posicionamiento de los botones:**
-Los botones van con `position: 'absolute'` sobre la imagen. La fila de botones se divide:
-- Botón `←` pegado a la izquierda (`left: 16`)
-- Botones `♡` y `⬆` pegados a la derecha (`right: 16`)
-
-```
-position: 'absolute'   →  saca el elemento del flujo normal
-top: (SafeArea)        →  lo ubica desde arriba
-left/right: 16         →  lo ubica desde el costado
+Se usa así:
+```tsx
+const diffColor = DIFFICULTY_COLOR[recipe.difficulty];
+// diffColor.bg   → color de fondo del badge
+// diffColor.text → color del texto del badge
 ```
 
-**Estilos clave:**
+### `SmallAvatar`
+
+```tsx
+function SmallAvatar({ name }: { name: string }) {
+  const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <View style={styles.smallAvatar}>
+      <Text style={styles.smallAvatarText}>{initials}</Text>
+    </View>
+  );
+}
+```
+
+Igual al `Avatar` de Perfil pero más chico (28px en vez de 56px). En el futuro esto podría extraerse a un componente compartido en `components/atoms/Avatar.tsx`.
+
 ```ts
-heroImage: {
-  width: '100%',
-  aspectRatio: 4/3,    // ← calcula la altura automáticamente según el ancho
-},
-heroOverlay: {
-  position: 'absolute',  // encima de la imagen
-  bottom: 0,
-  left: 0,
-  right: 0,
-  height: 120,           // solo la mitad inferior
-},
-heroButtons: {
-  position: 'absolute',
-  top: 52,               // debajo del notch
-  left: 16,
-  right: 16,
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-},
-heroBtn: {
-  width: 40,
-  height: 40,
-  borderRadius: 20,         // círculo
-  backgroundColor: 'rgba(255,255,255,0.9)',
+smallAvatar: {
+  width: 28,
+  height: 28,
+  borderRadius: 14,   // width / 2 = círculo
+  backgroundColor: colors.primaryLight,
   alignItems: 'center',
   justifyContent: 'center',
 },
 ```
 
----
+### `StarRating`
 
-### Paso 2 — Título y badge de dificultad
-
-**Qué es:** fila con el nombre de la receta a la izquierda y el badge "FÁCIL/MEDIO/DIFÍCIL" a la derecha.
-
+```tsx
+function StarRating({ rating, reviewCount }: { rating: number; reviewCount: number }) {
+  const full  = Math.floor(rating);        // 4.8 → 4 estrellas llenas
+  const half  = rating - full >= 0.5 ? 1 : 0;  // 0.8 >= 0.5 → 1 media estrella
+  const empty = 5 - full - half;           // 5 - 4 - 1 = 0 estrellas vacías
+  ...
+}
 ```
-Panqueques de Avena        [FÁCIL]
-```
 
-**Componentes:**
-- `Text` con `typography.displayL` → título grande
-- `View` (badge) con fondo de color según dificultad + `Text` con `typography.label`
+`Array.from({ length: N })` crea un array de N elementos vacíos solo para poder usar `.map()`:
+```tsx
+Array.from({ length: full }).map((_, i) => (
+  <Ionicons key={`f${i}`} name="star" size={14} color={colors.rating} />
+))
+```
+El `_` es convención para "no me interesa el valor del elemento, solo el índice `i`".
+
+La `key` usa un prefijo (`f`, `e`) para que React no confunda estrellas llenas con vacías cuando las lista una al lado de la otra.
+
+### `MetaChip`
+
+```tsx
+function MetaChip({ icon, value, label }: {
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string;
+  label: string;
+}) {
+  return (
+    <View style={styles.metaChip}>
+      <Ionicons name={icon} size={20} color={colors.primary} />
+      <Text style={styles.metaValue}>{value}</Text>
+      <Text style={styles.metaLabel}>{label}</Text>
+    </View>
+  );
+}
+```
 
 ```ts
-// Colores según dificultad (del design system, variante difficulty del Tag)
-const difficultyColor = {
-  'Fácil':   { bg: '#E8F5E9', text: '#388E3C' },  // verde
-  'Medio':   { bg: '#FFF8E1', text: '#F9A825' },  // amarillo
-  'Difícil': { bg: '#FFEBEE', text: '#C62828' },  // rojo
-};
+metaChip: {
+  flex: 1,                      // cada chip toma el mismo espacio en la fila
+  backgroundColor: colors.primaryLight,
+  borderRadius: 12,
+  paddingVertical: 12,
+  paddingHorizontal: 8,
+  alignItems: 'center',         // columna centrada
+  gap: 4,                       // espacio entre ícono, valor y label
+},
 ```
 
-**Estilos clave:**
+---
+
+## Pantalla principal `RecipeDetailScreen`
+
+### Setup y estado (líneas 80–100)
+
+```tsx
+type Tab = 'ingredientes' | 'pasos';
+
+const [activeTab, setActiveTab] = useState<Tab>('ingredientes');
+const [checked,   setChecked]   = useState<Set<string>>(new Set());
+```
+
+Los dos `useState` se declaran antes del guard de "no encontrada". Esto es obligatorio en React: los hooks **siempre** se llaman en el mismo orden, nunca dentro de un `if`.
+
+**Guard de receta no encontrada:**
+```tsx
+const recipe = getById(id as string);
+
+if (!recipe) {
+  return (
+    <View style={styles.notFound}>
+      <Text>Receta no encontrada</Text>
+    </View>
+  );
+}
+```
+Si `getById` devuelve `undefined`, mostramos una pantalla de error y cortamos la ejecución con `return`. Todo el código de abajo solo corre si `recipe` existe.
+
+**`toggleCheck`:**
+```tsx
+function toggleCheck(ingredientId: string) {
+  setChecked((prev) => {
+    const next = new Set(prev);                           // copia el Set anterior
+    next.has(ingredientId) ? next.delete(ingredientId) : next.add(ingredientId);
+    return next;                                          // devuelve la copia modificada
+  });
+}
+```
+Nunca modificamos el Set directamente — siempre creamos una copia (`new Set(prev)`) y devolvemos la copia. Esto es necesario porque React detecta cambios comparando referencias: si modificáramos el mismo objeto, React no vería la diferencia y no re-renderizaría.
+
+---
+
+### Paso 1 — Hero (líneas 106–142)
+
+```tsx
+<View>
+  <Image source={{ uri: recipe.imageUrl }} style={styles.heroImage} contentFit="cover" />
+  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.heroGradient} />
+  <View style={[styles.heroButtons, { top: insets.top + 8 }]}>
+    ...botones...
+  </View>
+</View>
+```
+
+**`contentFit="cover"`** — equivalente a `object-fit: cover` en CSS. La imagen llena el espacio recortando si es necesario, sin deformarse.
+
+**`LinearGradient`:**
+```tsx
+colors={['transparent', 'rgba(0,0,0,0.55)']}
+```
+El array de colores va de arriba a abajo. `transparent` arriba → negro semitransparente abajo. Hace legibles los botones y da profundidad.
+
+```ts
+heroGradient: {
+  position: 'absolute',  // encima de la imagen, fuera del flujo
+  bottom: 0,
+  left: 0,
+  right: 0,
+  height: 140,           // solo la mitad inferior del hero
+},
+```
+
+**Botones flotantes:**
+```tsx
+<View style={[styles.heroButtons, { top: insets.top + 8 }]}>
+```
+`insets.top` es la altura del notch (ej: 59px en iPhone 14). Sumarle 8px da respiro. Sin esto los botones quedarían debajo del notch y se verían cortados o superpuestos con el reloj.
+
+```ts
+heroButtons: {
+  position: 'absolute',       // fuera del flujo, sobre la imagen
+  left: 16,
+  right: 16,
+  flexDirection: 'row',
+  justifyContent: 'space-between',  // ← izquierda, derecha →
+},
+heroBtn: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.92)',  // blanco casi opaco
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+```
+
+**Botón like con estado:**
+```tsx
+<Ionicons
+  name={isLiked(recipe.id) ? 'heart' : 'heart-outline'}
+  color={isLiked(recipe.id) ? colors.error : colors.textPrimary}
+/>
+```
+Dos ternarios: uno para el ícono (relleno/vacío) y otro para el color (rojo/gris). `isLiked` viene del hook `useLikes`.
+
+---
+
+### Paso 2 — Título + badge (líneas 148–159)
+
+```tsx
+<View style={styles.titleRow}>
+  <Text style={styles.title} numberOfLines={3}>{recipe.title}</Text>
+  <View style={[styles.badge, { backgroundColor: diffColor.bg }]}>
+    <Text style={[styles.badgeText, { color: diffColor.text }]}>
+      {recipe.difficulty.toUpperCase()}
+    </Text>
+  </View>
+</View>
+```
+
 ```ts
 titleRow: {
   flexDirection: 'row',
-  alignItems: 'flex-start',   // alinea arriba (el badge no estira el título)
+  alignItems: 'flex-start',    // alinea arriba, no al centro
   justifyContent: 'space-between',
   gap: 12,
+},
+title: {
+  ...typography.displayL,
+  color: colors.textPrimary,
+  flex: 1,                     // ocupa el espacio disponible
 },
 badge: {
   paddingHorizontal: 10,
   paddingVertical: 4,
   borderRadius: 9999,          // pill
-  flexShrink: 0,               // no se encoge aunque el título sea largo
+  flexShrink: 0,               // nunca se achica, aunque el título sea largo
 },
 ```
 
+`alignItems: 'flex-start'` en vez de `'center'`: si el título ocupa 3 líneas, queremos que el badge quede alineado arriba, no al medio del bloque de texto.
+
+`flexShrink: 0` en el badge: por defecto los hijos de un `flexDirection: 'row'` pueden encogerse para caber. Con `flexShrink: 0` el badge siempre tiene su tamaño natural y el título es el que cede espacio.
+
 ---
 
-### Paso 3 — Autor y calificación
+### Paso 3 — Autor + estrellas (líneas 161–165)
 
-**Qué es:** fila con avatar pequeño, nombre del autor, estrellas y cantidad de reseñas.
-
+```tsx
+<View style={styles.authorRow}>
+  <SmallAvatar name={recipe.author.name} />
+  <Text style={styles.authorName}>{recipe.author.name}</Text>
+  <StarRating rating={recipe.rating} reviewCount={recipe.reviewCount} />
+</View>
 ```
-[SC]  Sofia Chen  ★★★★☆  342 reseñas
-```
 
-**Componentes:**
-- `Avatar` (reutilizable de perfil, size 28px)
-- `Text` nombre del autor
-- Estrellas: 5 íconos `star` / `star-outline` de Ionicons en color `colors.rating`
-- `Text` con el conteo de reseñas
-
-**Estilos clave:**
 ```ts
 authorRow: {
   flexDirection: 'row',
   alignItems: 'center',
   gap: 8,
-  marginTop: 8,
-},
-starsRow: {
-  flexDirection: 'row',
-  gap: 2,
+  marginTop: 12,
 },
 ```
+
+Sin `flex: 1` en ningún hijo porque queremos que cada elemento ocupe solo lo que necesita y queden pegados uno al lado del otro.
 
 ---
 
-### Paso 4 — MetaChips (tiempo y porciones)
+### Paso 4 — MetaChips (líneas 167–170)
 
-**Qué es:** fila de 2 chips con ícono + valor + label debajo.
-
-```
-┌──────────────┐  ┌──────────────┐
-│  ⏱  20 min  │  │  👥  4       │
-│  Cook Time   │  │  Porciones   │
-└──────────────┘  └──────────────┘
+```tsx
+<View style={styles.metaRow}>
+  <MetaChip icon="time-outline"   value={recipe.cookTime}         label="Cook Time" />
+  <MetaChip icon="people-outline" value={String(recipe.servings)} label="Porciones" />
+</View>
 ```
 
-**Componentes:**
-- `View` fila
-- 2x `MetaChip`: `View` con fondo `primaryLight`, ícono, valor en bold, label debajo
-
-**Estilos clave:**
-```ts
-metaRow: {
-  flexDirection: 'row',
-  gap: 12,
-  marginTop: 16,
-},
-metaChip: {
-  flex: 1,                    // cada chip ocupa el mismo espacio
-  backgroundColor: colors.primaryLight,
-  borderRadius: 12,
-  padding: 12,
-  alignItems: 'center',
-  gap: 4,
-},
-```
+`String(recipe.servings)` convierte el número `4` al string `"4"` porque el prop `value` del componente `MetaChip` es `string`. TypeScript tiraría error si pasáramos un `number` directamente.
 
 ---
 
-### Paso 5 — Descripción
+### Paso 5 — Descripción (línea 173)
 
-**Qué es:** párrafo de texto con la descripción de la receta.
+```tsx
+<Text style={styles.description}>{recipe.description}</Text>
+```
 
 ```ts
 description: {
   ...typography.bodyM,
   color: colors.textSecondary,
-  lineHeight: 22,
+  lineHeight: 22,    // más espacio entre líneas para párrafos largos
   marginTop: 16,
 },
 ```
 
-Sin lógica especial. Solo un `Text` que muestra `recipe.description`.
-
 ---
 
-### Paso 6 — Tab Selector (Ingredientes / Pasos)
+### Paso 6 — Tab Selector (líneas 175–186)
 
-**Qué es:** 2 tabs que controlan qué lista se muestra abajo.
-
-```
-[ Ingredientes ]  [ Pasos ]
- ───────────────
-```
-
-**Estado que controla el tab:**
 ```tsx
-const [activeTab, setActiveTab] = useState<'ingredientes' | 'pasos'>('ingredientes');
+<View style={styles.tabBar}>
+  {(['ingredientes', 'pasos'] as Tab[]).map((tab) => (
+    <TouchableOpacity
+      key={tab}
+      style={[styles.tab, activeTab === tab && styles.tabActive]}
+      onPress={() => setActiveTab(tab)}
+    >
+      <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</View>
 ```
 
-**Lógica visual del tab activo vs inactivo:**
-- Activo: texto `colors.primary`, línea naranja de 2px abajo
-- Inactivo: texto `colors.textSecondary`, sin línea
+**`(['ingredientes', 'pasos'] as Tab[])`** — creamos el array de tabs en el JSX y lo tipeamos como `Tab[]`. Así si mañana agregamos un tab, solo lo ponemos acá.
 
-**Estilos clave:**
+**`tab.charAt(0).toUpperCase() + tab.slice(1)`** — capitaliza la primera letra: `'ingredientes'` → `'Ingredientes'`. Alternativa a tener un objeto de labels separado.
+
+**Lógica de estilo activo/inactivo:**
+```tsx
+style={[styles.tab, activeTab === tab && styles.tabActive]}
+```
+Si `activeTab === tab` es `true`, se aplica `styles.tabActive` (que agrega `borderBottomWidth: 2`). Si es `false`, el `&&` cortocircuita y no aplica nada.
+
 ```ts
 tabBar: {
   flexDirection: 'row',
   borderBottomWidth: 1,
-  borderBottomColor: colors.border,
+  borderBottomColor: colors.border,   // línea base gris
   marginTop: 20,
 },
 tab: {
@@ -307,115 +494,131 @@ tab: {
   alignItems: 'center',
 },
 tabActive: {
-  borderBottomWidth: 2,
+  borderBottomWidth: 2,               // sobrescribe la línea base con naranja
   borderBottomColor: colors.primary,
 },
-tabText: {
-  ...typography.h3,
+```
+
+---
+
+### Paso 7A — Lista de ingredientes (líneas 188–213)
+
+```tsx
+{activeTab === 'ingredientes' && (
+  <View style={styles.tabContent}>
+    <Text style={styles.tabCount}>{recipe.ingredients.length} ingredientes</Text>
+    {recipe.ingredients.map((ing, index) => (
+      <React.Fragment key={ing.id}>
+        <TouchableOpacity
+          style={styles.ingredientRow}
+          onPress={() => toggleCheck(ing.id)}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={checked.has(ing.id) ? 'radio-button-on' : 'radio-button-off'}
+            size={20}
+            color={checked.has(ing.id) ? colors.primary : colors.textMuted}
+          />
+          <Text style={[styles.ingredientName, checked.has(ing.id) && styles.ingredientChecked]}>
+            {ing.name}
+          </Text>
+          <Text style={styles.ingredientAmount}>{ing.amount}</Text>
+        </TouchableOpacity>
+        {index < recipe.ingredients.length - 1 && <View style={styles.ingredientSep} />}
+      </React.Fragment>
+    ))}
+  </View>
+)}
+```
+
+**`React.Fragment`** — wrapper invisible que no agrega un `View` al DOM. Lo necesitamos porque queremos que cada ítem de la lista tenga `key` pero renderice dos elementos (`TouchableOpacity` + `View` separador). Sin `Fragment`, tendríamos que envolver en un `View` y eso agregaría nodos innecesarios.
+
+**`{index < recipe.ingredients.length - 1 && <View ... />}`** — el separador solo aparece entre ítems, no después del último. `length - 1` es el índice del último elemento.
+
+```ts
+ingredientChecked: {
+  textDecorationLine: 'line-through',   // tachado
+  color: colors.textMuted,              // más suave
+},
+ingredientSep: {
+  height: 1,
+  backgroundColor: colors.border,
+  marginLeft: 32,                       // alineado después del radio button
+},
+```
+
+---
+
+### Paso 7B — Lista de pasos (líneas 215–229)
+
+```tsx
+{activeTab === 'pasos' && (
+  <View style={styles.tabContent}>
+    {recipe.steps.map((step) => (
+      <View key={step.id} style={styles.stepRow}>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepNumber}>{step.order}</Text>
+        </View>
+        <Text style={styles.stepText}>{step.description}</Text>
+      </View>
+    ))}
+  </View>
+)}
+```
+
+Sin estado — solo renderiza. No necesita `React.Fragment` porque cada step tiene solo un elemento raíz (`View`).
+
+```ts
+stepRow: {
+  flexDirection: 'row',
+  gap: 16,
+  marginBottom: 20,
+},
+stepBadge: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,            // círculo
+  backgroundColor: colors.primary,
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,               // no se achica si el texto del paso es muy largo
+},
+stepNumber: {
+  ...typography.buttonSm,
+  color: colors.surface,       // blanco sobre naranja
+},
+stepText: {
+  ...typography.bodyM,
   color: colors.textSecondary,
+  flex: 1,                     // ocupa el espacio restante
+  lineHeight: 22,
 },
-tabTextActive: {
-  color: colors.primary,
-},
 ```
 
 ---
 
-### Paso 7A — Lista de ingredientes (tab activo por defecto)
-
-**Qué es:** lista de ingredientes con checkbox a la izquierda y cantidad a la derecha. El checkbox se puede marcar para tachar el ítem.
-
-```
-○  Avena                    1 taza
-─────────────────────────────────
-○  Banana madura            1 grande
-─────────────────────────────────
-○  Huevos                   2 unidades
-```
-
-**Estado local para los checkboxes:**
-```tsx
-const [checked, setChecked] = useState<Set<string>>(new Set());
-
-function toggleCheck(id: string) {
-  setChecked(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
-}
-```
-
-`Set` es una estructura de datos de JavaScript que guarda valores únicos — ideal para IDs de ingredientes marcados.
-
-**Componentes:**
-- `TouchableOpacity` por ítem
-- Ícono `radio-button-on` (marcado) / `radio-button-off` (sin marcar)
-- `Text` con `textDecorationLine: 'line-through'` cuando está marcado
-
----
-
-### Paso 7B — Lista de pasos (tab inactivo)
-
-**Qué es:** lista numerada de pasos con badge naranja y texto descriptivo.
-
-```
-①  Licuá la avena, banana, huevos, leche,
-   vainilla, canela y sal hasta obtener
-   una mezcla homogénea.
-
-②  Dejá reposar la mezcla 5 minutos...
-```
-
-**Componentes:**
-- Badge número: `View` circular naranja + `Text` con el número
-- `Text` con el texto del paso
-
-Sin estado local — solo renderiza `recipe.steps` con `.map()`.
-
----
-
-## Orden de construcción sugerido
-
-| Orden | Paso | Por qué primero |
-|---|---|---|
-| 1 | Setup + data | Sin datos no hay nada que mostrar |
-| 2 | Hero imagen | Define la altura y posición de todo lo demás |
-| 3 | Panel de contenido | El contenedor blanco que va encima |
-| 4 | Título + badge | Primera info visible |
-| 5 | Autor + estrellas | Segunda fila de info |
-| 6 | MetaChips | Fila de datos rápidos |
-| 7 | Descripción | Solo texto |
-| 8 | TabSelector | Controla qué lista se muestra |
-| 9 | Lista ingredientes | Tab activo por defecto |
-| 10 | Lista pasos | Tab secundario |
-
----
-
-## Nuevos imports que va a necesitar esta pantalla
-
-```tsx
-import { useState } from 'react';                          // estado local (tabs, checkboxes)
-import { Image } from 'expo-image';                        // imagen optimizada con caché
-import { LinearGradient } from 'expo-linear-gradient';     // degradado sobre el hero
-import { useLocalSearchParams } from 'expo-router';        // leer el [id] de la URL
-import { useRecipes } from '@/hooks/useRecipes';           // buscar la receta por ID
-import { useLikes } from '@/hooks/useLikes';               // estado del botón corazón
-```
-
----
-
-## Patrones nuevos en esta pantalla
+## Resumen de patrones nuevos
 
 | Patrón | Dónde | Para qué |
 |---|---|---|
-| `[id].tsx` ruta dinámica | Nombre del archivo | Un solo archivo sirve para todas las recetas |
-| `useLocalSearchParams` | Setup | Leer el parámetro `id` de la URL |
-| `useState` | Tabs, checkboxes | Guardar estado que puede cambiar en pantalla |
-| `aspectRatio: 4/3` | Hero image | Altura automática proporcional al ancho |
-| `position: 'absolute'` | Botones del hero | Superponer elementos fuera del flujo normal |
-| `Set` para checkboxes | Lista ingredientes | Estructura eficiente para IDs marcados |
-| `.map()` para listas | Ingredientes, pasos | Renderizar una lista de datos dinámicamente |
-| `textDecorationLine: 'line-through'` | Ingrediente marcado | Tachar texto con CSS nativo |
-| `flexShrink: 0` | Badge dificultad | Evitar que el badge se comprima por un título largo |
-| `gap` entre elementos | MetaChips, stars | Espaciado uniforme sin margin en cada hijo |
+| `[id].tsx` | Nombre del archivo | Ruta dinámica — un archivo para todas las recetas |
+| `useLocalSearchParams<{ id: string }>()` | Setup | Leer el parámetro de la URL con tipo |
+| `useSafeAreaInsets()` | Botones hero | Posicionar elementos respetando el notch |
+| `useState<Tab>` | Tab selector | Estado local que re-renderiza al cambiar |
+| `useState<Set<string>>` | Checkboxes | Set de IDs marcados |
+| `new Set(prev)` en setter | `toggleCheck` | Copiar antes de mutar — React necesita nueva referencia |
+| `marginTop: -24` | Panel sobre hero | Solapar el panel blanco con la imagen |
+| `contentFit="cover"` | `expo-image` | Equivalente a `object-fit: cover` |
+| `LinearGradient` | Hero | Degradado de `transparent` a oscuro para legibilidad |
+| `position: 'absolute'` | Gradiente y botones | Superponer sobre la imagen |
+| `insets.top + 8` | Botones hero | Respetar el notch en cualquier dispositivo |
+| `Record<Difficulty, ...>` | `DIFFICULTY_COLOR` | Objeto tipeado con todas las claves del tipo |
+| `Array.from({ length: N }).map(...)` | Estrellas | Crear N elementos sin array de datos |
+| `key` con prefijo (`f${i}`, `e${i}`) | Estrellas | Evitar colisión de keys en listas del mismo render |
+| `React.Fragment` con `key` | Ingredientes | Wrapper invisible para listas con múltiples nodos por ítem |
+| `index < arr.length - 1` | Separador ingredientes | Separador entre ítems, no después del último |
+| `String(recipe.servings)` | MetaChip | Convertir número a string para prop tipada |
+| `flexShrink: 0` | Badge, stepBadge | Evitar que el elemento se encoja en una fila |
+| `tab.charAt(0).toUpperCase() + tab.slice(1)` | Tab labels | Capitalizar string sin librería |
+| `textDecorationLine: 'line-through'` | Ingrediente marcado | Tachar texto |
+| `alignItems: 'flex-start'` | titleRow | Alinear badge arriba cuando el título es multilínea |
