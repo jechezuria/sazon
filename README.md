@@ -4,7 +4,7 @@
   <img src="./assets/images/logo.png" alt="Logo de Sazón" width="160" />
 </p>
 
-> Aplicación móvil para descubrir, guardar y compartir recetas con una experiencia simple, visual y pensada para cocinar sin fricción.
+> Aplicación móvil para descubrir, guardar y compartir recetas con una experiencia simple y visual.
 
 ## Descripción
 
