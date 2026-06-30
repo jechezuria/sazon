@@ -1,4 +1,4 @@
-import { MOCK_USER } from "@/data/mockData";
+import { useAuth } from "@/context/AuthContext";
 import { colors } from "@/theme/colors";
 import { shadows } from "@/theme/shadows";
 import { typography } from "@/theme/typography";
@@ -108,12 +108,19 @@ function Section({ title, children }: SectionProps) {
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function PerfilScreen() {
   const router = useRouter();
-  const user = MOCK_USER;
+  const { user, logout } = useAuth();
 
-  function handleLogout() {
+  async function handleLogout() {
     Alert.alert("Cerrar sesión", "¿Estás seguro que querés cerrar sesión?", [
       { text: "Cancelar", style: "cancel" },
-      { text: "Cerrar sesión", style: "destructive", onPress: () => {} },
+      {
+        text: "Cerrar sesión",
+        style: "destructive",
+        onPress: async () => {
+          await logout();
+          router.replace("/login");
+        },
+      },
     ]);
   }
 
@@ -145,11 +152,11 @@ export default function PerfilScreen() {
         {/* ── PASO 2: Card de perfil ── */}
         {/* TouchableOpacity porque va a navegar a "Editar perfil" */}
         <TouchableOpacity style={styles.profileCard} activeOpacity={0.8} onPress={() => router.push('/perfil/editar')}>
-          <Avatar name={user.name} />
+          <Avatar name={user?.name ?? '?'} />
 
           <View style={styles.profileInfo}>
             <Text style={[typography.h2, { color: colors.textPrimary }]}>
-              {user.name}
+              {user?.name ?? ''}
             </Text>
             <Text
               style={[
@@ -157,9 +164,9 @@ export default function PerfilScreen() {
                 { color: colors.textSecondary, marginTop: 2 },
               ]}
             >
-              @{user.username}
+              @{user?.username ?? ''}
             </Text>
-            {user.bio ? (
+            {user?.bio ? (
               <Text
                 style={[
                   typography.bodyS,
