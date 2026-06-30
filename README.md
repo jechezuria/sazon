@@ -1,50 +1,47 @@
-# Welcome to your Expo app 👋
+# Sazón
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+<p align="center">
+  <img src="./assets/images/logo.png" alt="Logo de Sazón" width="160" />
+</p>
 
-## Get started
+> Aplicación móvil para descubrir, guardar y compartir recetas con una experiencia simple, visual y pensada para cocinar sin fricción.
 
-1. Install dependencies
+## Descripción
+
+Sazón es una app construida con Expo para explorar recetas, organizar favoritos y crear nuevas preparaciones desde un flujo rápido y claro. La experiencia prioriza una navegación simple, tarjetas visuales y pantallas pensadas para mejorar la experiencia culinaria.
+
+## Integrantes
+
+### jechezuria
+Colaborador del proyecto. Se encarga de la implementación general de la app, la integración con el backend y la definición de la experiencia de usuario.
+
+### carpineiro17
+Colaborador del proyecto con foco en soporte técnico y mejora de funcionalidades. Participa en ajustes de la interfaz, validación de flujos y mantenimiento del producto.
+
+### joaquinolmed
+Colaborador del proyecto orientado a revisión de producto y soporte de desarrollo. Aporta en la organización de la app, pruebas de uso y refinamiento de detalles.
+
+## Tecnologías
+
+- Expo
+- React Native
+- Expo Router
+- TypeScript
+
+## Cómo ejecutar el proyecto
+
+1. Instalar dependencias:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Iniciar la app:
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## Logo
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Colocá la imagen del logo en [assets/images/logo.png](assets/images/logo.png) para que aparezca en la portada del README.
