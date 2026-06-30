@@ -27,6 +27,8 @@ SafeAreaView
     ├── [SECCIÓN] CONTENIDO
     │     Mis publicaciones  >
     │     ─────────────────
+    │     Mis favoritos  >
+    │     ─────────────────
     │     Crear receta  >
     │
     └── [SECCIÓN] SESIÓN
@@ -546,6 +548,12 @@ En esta sección ("Mi cuenta") los `MenuItem` no tienen `danger`, entonces usan 
     icon="bookmark-outline"
     label="Mis publicaciones"
     onPress={() => {}}
+  />
+  <Separator />
+  <MenuItem
+    icon="heart-outline"
+    label="Mis favoritos"
+    onPress={() => router.push("/favoritos")}
   />
   <Separator />
   <MenuItem
