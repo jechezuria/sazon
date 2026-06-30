@@ -4,6 +4,140 @@ Este archivo documenta qué hace cada parte del código que vamos construyendo, 
 
 ---
 
+## `app/(tabs)/buscar.tsx` — Primera conexión real al backend
+
+Esta pantalla es la primera en dejar de usar el mock data: la búsqueda ahora le pega al backend real (`GET /api/recipes?search=...`) en lugar de filtrar el array `MOCK_RECIPES` en memoria. El resto de la pantalla (recientes, ingredientes, likes) sigue igual que antes.
+
+### El problema de pegarle a una API en cada tecla
+
+Con el mock, `search(query)` era una función síncrona — corría instantáneo en el dispositivo. Ahora es una llamada de red, que tarda y tiene costo. Si dispararas una request por cada letra que escribe el usuario ("p", "po", "pol", "poll"...), mandarías 4 requests para escribir una palabra de 4 letras, casi todas inútiles porque el usuario sigue escribiendo.
+
+**La solución es debounce**: esperar un poco después de la última tecla antes de buscar.
+
+```tsx
+useEffect(() => {
+  const trimmed = query.trim();
+  if (trimmed.length === 0) { /* limpiar todo */ return; }
+
+  let cancelled = false;
+  setLoading(true);
+
+  const timeoutId = setTimeout(async () => {
+    try {
+      const data = await getRecipes({ search: trimmed });
+      if (!cancelled) setResultados(data);
+    } catch {
+      if (!cancelled) setError(true);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  }, 400);
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timeoutId);
+  };
+}, [query]);
+```
+
+> Cada vez que `query` cambia, React primero ejecuta la función de **cleanup** (el `return () => {...}`) del efecto anterior, y *después* corre el nuevo efecto. Como el cleanup hace `clearTimeout`, si el usuario escribe una letra nueva antes de que pasen los 400ms, el timeout viejo se cancela y arranca uno nuevo. Solo se dispara la request real cuando el usuario deja de tipear por 400ms.
+
+### El problema de las respuestas que llegan en el orden equivocado
+
+Incluso con debounce, dos requests pueden estar "en vuelo" al mismo tiempo (por ejemplo, si la red está lenta). Si la respuesta de una búsqueda vieja ("po") llega *después* de la respuesta de la búsqueda nueva ("pollo"), pisaría los resultados correctos con resultados viejos.
+
+```tsx
+let cancelled = false;
+...
+const timeoutId = setTimeout(async () => {
+  const data = await getRecipes({ search: trimmed });
+  if (!cancelled) setResultados(data);   // ← el chequeo clave
+  ...
+}, 400);
+
+return () => { cancelled = true; ... };
+```
+> `cancelled` es una variable capturada por el closure de ese efecto específico. Cuando el efecto se "limpia" (porque `query` volvió a cambiar), `cancelled` pasa a `true` *para esa instancia del efecto* — pero la respuesta de la request vieja, cuando finalmente llegue, va a revisar su propia copia de `cancelled` (que ahora es `true`) y va a decidir no actualizar el estado. Es un patrón estándar para evitar "race conditions" en componentes de React con datos async.
+
+### Tres estados de la UI en lugar de uno
+
+Con datos síncronos del mock solo había dos casos: "hay resultados" o "no hay resultados". Con una API real hay que sumar un tercero: **mientras se espera la respuesta** y **si la red falla**.
+
+```tsx
+loading ? (
+  <ActivityIndicator color={colors.primary} size="large" />
+) : error ? (
+  <Text>No pudimos conectar</Text>
+) : resultados.length > 0 ? (
+  <View style={styles.grid}>...</View>
+) : (
+  <Text>Sin resultados</Text>
+)
+```
+> Es importante no confundir "todavía no llegó la respuesta" con "la respuesta llegó y vino vacía" — son situaciones distintas para el usuario y necesitan mensajes distintos.
+
+---
+
+## `services/` — Capa de conexión al backend
+
+Esta carpeta es nueva y **todavía no se usa** en ninguna pantalla — las pantallas siguen usando `useRecipes`/`useLikes` con el mock data como hasta ahora. Es la capa lista para cuando decidamos reemplazar los datos mockeados por datos reales del backend (`backend-sazon`).
+
+### `services/config.ts` — la URL en un solo lugar
+
+```ts
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+```
+> Expo solo expone al código del cliente las variables de entorno que empiezan con `EXPO_PUBLIC_` — es una medida de seguridad para que no termines mandando un secreto del backend (como una API key) al bundle de la app por accidente.
+> El `??` es el operador de coalescencia nula: si la variable de entorno no está definida, usa `'http://localhost:4000'` como respaldo. Cuando el backend esté en Render, alcanza con cambiar el `.env` (o el valor por defecto) — ningún archivo de servicio necesita tocarse.
+
+### `services/apiClient.ts` — un solo wrapper sobre `fetch`
+
+```ts
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  ...
+}
+```
+> En lugar de llamar a `fetch` directamente desde cada servicio (y repetir el manejo de headers, JSON y errores 8 veces), todos los servicios pasan por esta única función. Si mañana hay que agregar, por ejemplo, un timeout global o loguear todas las requests, se cambia en un solo lugar.
+
+```ts
+export class ApiError extends Error {
+  status: number;
+  ...
+}
+```
+> Extender `Error` permite crear un tipo de error específico de la app. Así, quien use el servicio puede hacer `catch (err) { if (err instanceof ApiError && err.status === 401) ... }` y reaccionar distinto según el código HTTP, en lugar de parsear el mensaje de texto.
+
+```ts
+if (response.status === 204) {
+  return undefined as T;
+}
+```
+> El status `204 No Content` (lo devuelve por ejemplo un DELETE) no tiene body. Si se intentara hacer `response.json()` sobre una respuesta vacía, fallaría — por eso se corta antes.
+
+### `services/recipes.service.ts` — filtros como query params
+
+```ts
+function buildQuery(filters: RecipeFilters): string {
+  const params = new URLSearchParams();
+  if (filters.category) params.set('category', filters.category);
+  ...
+  return query ? `?${query}` : '';
+}
+```
+> `URLSearchParams` arma el string de query (`?category=Postre&search=avena`) escapando caracteres especiales automáticamente (espacios, tildes, etc.) — más seguro que concatenar strings a mano.
+> Los filtros son todos opcionales (`category?`, `difficulty?`) — si no se pasa ninguno, `getRecipes()` sin argumentos trae todas las recetas, igual que `useRecipes().getAll()` hace hoy con el mock.
+
+### Por qué el token se pasa como parámetro y no se guarda solo
+
+```ts
+export function getMyLikedRecipes(token: string): Promise<Recipe[]> {
+  return apiRequest<Recipe[]>('/api/recipes/liked/mine', { token });
+}
+```
+> Estos servicios son funciones puras: no saben de dónde viene el token ni dónde se guarda (`AsyncStorage`, `SecureStore`, un Context de React, etc.). Esa decisión se toma en otra capa, todavía no construida, que maneje la sesión del usuario. Mantener los servicios "tontos" (solo saben hablar HTTP) hace que sean fáciles de testear y de reutilizar sin importar cómo se resuelva el login más adelante.
+
+---
+
 ## Estructura general del proyecto
 
 ```
@@ -302,6 +436,212 @@ compactLike: {
 }
 ```
 > `position: 'absolute'` saca al elemento del flujo del layout. Se posiciona relativo al ancestro más cercano que tenga `position: 'relative'` (o cualquier posición). Acá el ancestro es la card que tiene `overflow: 'hidden'`, lo que recorta el botón si se sale de los bordes.
+
+---
+
+## `app/(tabs)/buscar.tsx` — Pantalla de Búsqueda
+
+### Paso 1: Header + barra de búsqueda
+
+**¿Por qué esta pantalla es diferente al buscador del Home?**
+En el Home la barra es un `Pressable` decorativo — al tocarla te lleva a esta pantalla. Acá es un `TextInput` real donde el usuario escribe, React guarda el texto y lo usa para filtrar recetas.
+
+```tsx
+const [query, setQuery] = useState('');
+const [focused, setFocused] = useState(false);
+const inputRef = useRef<TextInput>(null);
+```
+> Dos estados independientes:
+> - `query` — el texto que escribe el usuario
+> - `focused` — si el input está activo o no (para cambiar el estilo del borde)
+>
+> `useRef` guarda una referencia directa al componente `TextInput`. No es un valor de estado — no provoca re-renders. Sirve para llamar métodos del input desde afuera, como `.focus()`.
+
+```tsx
+<Pressable onPress={() => inputRef.current?.focus()} style={[styles.searchBar, focused && styles.searchBarFocused]}>
+```
+> El `Pressable` externo hace que tocar en cualquier parte de la barra (no solo el input) enfoque el cursor. Sin esto, el usuario tendría que tocar exactamente el texto para activar el teclado.
+> `inputRef.current?.focus()` — el `?.` es optional chaining: si `current` es null (el componente no montó todavía), no falla.
+
+```tsx
+// Estilo dinámico según el estado focused
+style={[styles.searchBar, focused && styles.searchBarFocused]}
+```
+> React Native acepta arrays de estilos. El último estilo del array gana en caso de conflicto. `focused && styles.searchBarFocused` devuelve el objeto de estilo si `focused` es true, o `false` si no — React Native ignora los valores falsy en el array de estilos.
+
+```tsx
+searchBar: {
+  borderColor: colors.border,     // Gris por defecto
+},
+searchBarFocused: {
+  borderColor: colors.primary,    // Naranja cuando está activo
+  backgroundColor: colors.surface, // Fondo blanco (era crema)
+},
+```
+> El cambio de borde naranja al enfocar le da feedback visual al usuario: "estás escribiendo acá". Es un patrón estándar de UX para inputs.
+
+```tsx
+{query.length > 0 && (
+  <Pressable onPress={() => setQuery('')} accessibilityLabel="Limpiar búsqueda">
+    <Feather name="x" size={16} color={colors.textMuted} />
+  </Pressable>
+)}
+```
+> El botón de limpiar (`x`) solo aparece cuando hay texto escrito. `query.length > 0` evalúa a `true` si hay al menos un caracter — el cortocircuito `&&` renderiza el componente solo si la condición es verdadera.
+
+```tsx
+<TextInput
+  returnKeyType="search"   // Muestra "Buscar" en el teclado en lugar de "Intro"
+  autoCorrect={false}      // Evita que corrija ingredientes o nombres propios
+/>
+```
+
+```tsx
+// Header con bordes redondeados abajo
+header: {
+  backgroundColor: colors.surface,
+  borderBottomLeftRadius: radius.xl,   // Solo los bordes inferiores
+  borderBottomRightRadius: radius.xl,
+  shadowColor: '#000',
+  shadowOpacity: 0.05,                 // Sombra muy sutil — solo para separarlo del fondo
+  elevation: 3,
+}
+```
+> Redondear solo los bordes inferiores crea el efecto de "card que sale de arriba". Los bordes superiores quedan rectos contra el borde de la pantalla.
+
+---
+
+### Paso 2: Pills de filtro
+
+```tsx
+const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
+const [filtroActivo, setFiltroActivo] = useState('Todo');
+```
+> Mismo patrón que las categorías del Home — array de strings + estado local. Se reutiliza exactamente el mismo componente `CategoryPill` sin modificarlo.
+
+**¿Por qué las pills van dentro del `header` y no en el `ScrollView`?**
+Porque en el diseño el fondo blanco abarca título + buscador + pills. Si las pills estuvieran en el scroll, quedarían sobre el fondo crema (`colors.bg`). Al ponerlas dentro del mismo `View` del header, heredan su `backgroundColor: colors.surface`.
+
+```tsx
+pillsScroll: {
+  marginHorizontal: -spacing.lg,  // -16pt
+  marginTop: spacing.lg,
+},
+pillsRow: {
+  paddingHorizontal: spacing.lg,  // +16pt
+},
+```
+> El header tiene `paddingHorizontal: 16`. Sin el margen negativo, las pills arrancan con 16pt de espacio a la izquierda y la primera pill quedaría desplazada. El `-16` cancela ese padding y el `paddingHorizontal` del `contentContainerStyle` lo repone — el resultado es que las pills arrancan desde el mismo borde que el título y la barra.
+
+---
+
+### Paso 3: Búsquedas recientes
+
+```tsx
+const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
+```
+> Por ahora son datos fijos (mock). En una app real esto vendría de `AsyncStorage` o similar — se guardaría cada vez que el usuario ejecuta una búsqueda.
+
+```tsx
+<Pressable onPress={() => setQuery(term)} ...>
+```
+> Al tocar un resultado reciente, se copia el texto al estado `query`. Esto simula que el usuario escribió ese texto — en el Paso 5 (resultados) ese `query` va a filtrar las recetas automáticamente.
+
+```tsx
+// Separador solo entre ítems, no después del último
+style={[styles.recentItem, index < RECIENTES.length - 1 && styles.recentItemBorder]}
+```
+> `index < RECIENTES.length - 1` es `true` para todos los ítems excepto el último. Así el borde separador aparece entre ítems pero no debajo del último, evitando una línea flotante al final de la card.
+
+```tsx
+recentList: {
+  backgroundColor: colors.surface,
+  borderRadius: radius.lg,
+  overflow: 'hidden',   // ← importante
+},
+```
+> `overflow: 'hidden'` hace que los bordes redondeados de la card recorten los ítems internos. Sin esto, el primer y último ítem no respetarían el `borderRadius` del contenedor y los bordes de la card se verían cuadrados en las esquinas.
+
+---
+
+### Paso 4: Buscar por ingrediente
+
+```tsx
+const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arroz', 'Queso'];
+```
+> Sin emojis — la decisión de diseño es que las pills de texto solas se ven más prolijas y profesionales. El componente `CategoryPill` tiene `emoji` como prop opcional, así que simplemente no se pasa.
+
+```tsx
+<CategoryPill
+  active={query === ing}
+  onPress={() => setQuery(ing)}
+/>
+```
+> Mismo componente que las categorías del Home y los filtros de esta pantalla, usado por tercera vez sin modificarlo. `active` se activa cuando el texto del input coincide exactamente con el ingrediente — si el usuario escribe "Pollo" a mano o toca la pill, la pill queda resaltada.
+> `onPress` hace lo mismo que las búsquedas recientes: copia el label al estado `query`.
+
+**`flexWrap` vs `ScrollView horizontal`**
+
+```tsx
+// Scroll horizontal — los items van en una sola fila infinita
+<ScrollView horizontal>
+  <CategoryPill /> <CategoryPill /> ...
+</ScrollView>
+
+// Wrap — los items se acomodan en filas según el espacio disponible
+<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+  <CategoryPill /> <CategoryPill /> ...
+</View>
+```
+> Con `ScrollView horizontal` el usuario tiene que scrollear para ver todos los ingredientes. Con `flexWrap` todos son visibles de una sola vez, distribuidos en filas. Para una lista corta de ingredientes predefinidos, `flexWrap` es mejor UX porque no requiere descubrimiento.
+
+---
+
+### Paso 5: Resultados de búsqueda
+
+```tsx
+const resultados = useMemo(() => {
+  if (query.trim().length === 0) return [];
+  return search(query.trim());
+}, [query]);
+```
+> `query.trim()` elimina espacios al inicio y al final — evita que un espacio accidental dispare una búsqueda vacía.
+> Si no hay texto, devuelve array vacío sin ni siquiera llamar a `search()`. `useMemo` recalcula solo cuando `query` cambia.
+
+```tsx
+{query.trim().length > 0 ? (
+  resultados.length > 0 ? (
+    /* grilla de resultados */
+  ) : (
+    /* estado vacío */
+  )
+) : (
+  /* recientes + ingredientes */
+)}
+```
+> Tres estados posibles manejados con ternarios anidados:
+> 1. Sin texto → pantalla de descubrimiento (recientes + ingredientes)
+> 2. Con texto + resultados → grilla de cards
+> 3. Con texto + sin resultados → estado vacío con mensaje
+>
+> Los ternarios anidados pueden ser difíciles de leer. Una alternativa más clara sería extraer cada estado a una función o componente separado, pero para tres estados simples está bien así.
+
+```tsx
+<Text style={styles.sectionLabel}>
+  {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
+</Text>
+```
+> Pluralización manual: si hay 1 resultado dice "1 resultado", si hay más dice "2 resultados". El ternario `!== 1 ? 's' : ''` agrega la "s" solo cuando corresponde.
+
+**Estado vacío (empty state)**
+```tsx
+<View style={styles.emptyState}>
+  <Feather name="search" size={40} color={colors.textMuted} />
+  <Text style={styles.emptyTitle}>Sin resultados</Text>
+  <Text style={styles.emptySubtitle}>No encontramos recetas para "{query}"</Text>
+</View>
+```
+> El empty state es importante en UX — sin él el usuario ve una pantalla en blanco y no sabe si algo falló o simplemente no hay resultados. Mostrar el término buscado entre comillas confirma que la app sí procesó la búsqueda.
 
 ---
 

@@ -1,216 +1,316 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
+  ActivityIndicator,
+  Dimensions,
+  Pressable,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
+import { spacing, radius } from '@/theme/spacing';
+import { CategoryPill } from '@/components/molecules/CategoryPill';
+import { RecipeCard } from '@/components/molecules/RecipeCard';
+import { useLikes } from '@/hooks/useLikes';
+import { getRecipes } from '@/services/recipes.service';
+import { Recipe } from '@/types';
 
-// Datos para las categorías y los ingredientes
-const CATEGORIES = [
-  { id: '1', label: 'Cena rápida', icon: '🌙' },
-  { id: '2', label: 'Vegano', icon: '🌿' },
-  { id: '3', label: 'Postres', icon: '🍰' },
-  { id: '4', label: 'Saludable', icon: '🥗' },
-];
+const SEARCH_DEBOUNCE_MS = 400;
 
-const INGREDIENTS = [
-  { id: '1', emoji: '🥑', label: 'Palta' },
-  { id: '2', emoji: '🍗', label: 'Pollo' },
-  { id: '3', emoji: '🍋', label: 'Limón' },
-  { id: '4', emoji: '🥚', label: 'Huevo' },
-];
+const SCREEN_W = Dimensions.get('window').width;
+const CARD_GAP = spacing.md;
+const CARD_W = (SCREEN_W - spacing.lg * 2 - CARD_GAP) / 2;
+
+const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
+
+const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
+
+const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arroz', 'Queso'];
 
 export default function BuscarScreen() {
+  const router = useRouter();
   const [query, setQuery] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [filtroActivo, setFiltroActivo] = useState('Todo');
+  const inputRef = useRef<TextInput>(null);
+
+  const { toggleLike, isLiked } = useLikes();
+
+  const [resultados, setResultados] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
+      setResultados([]);
+      setLoading(false);
+      setError(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+
+    // Debounce: espera a que el usuario deje de tipear antes de pegarle a la API
+    const timeoutId = setTimeout(async () => {
+      try {
+        const data = await getRecipes({ search: trimmed });
+        if (!cancelled) setResultados(data);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [query]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* 🔍 Header con Buscador Estilo Sazón */}
+    <SafeAreaView style={styles.safe}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explorar</Text>
-        <View style={styles.searchBox}>
-          <Text style={{ fontSize: 16 }}>🔍</Text>
+        <Text style={styles.title}>Buscar recetas</Text>
+
+        {/* Barra de búsqueda — real TextInput, no decorativa */}
+        <Pressable onPress={() => inputRef.current?.focus()} style={[styles.searchBar, focused && styles.searchBarFocused]}>
+          <Feather
+            name="search"
+            size={18}
+            color={focused ? colors.primary : colors.textMuted}
+          />
           <TextInput
-            style={styles.searchInput}
-            placeholder="¿Qué quieres cocinar hoy?"
+            ref={inputRef}
+            style={styles.input}
+            placeholder="Buscá recetas, ingredientes..."
             placeholderTextColor={colors.textMuted}
             value={query}
             onChangeText={setQuery}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            returnKeyType="search"
+            autoCorrect={false}
           />
-        </View>
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')} accessibilityLabel="Limpiar búsqueda">
+              <Feather name="x" size={16} color={colors.textMuted} />
+            </Pressable>
+          )}
+        </Pressable>
+
+        {/* Pills de filtro — dentro del header para mantener el fondo blanco */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pillsRow}
+          style={styles.pillsScroll}
+        >
+          {FILTROS.map(filtro => (
+            <CategoryPill
+              key={filtro}
+              label={filtro}
+              active={filtroActivo === filtro}
+              onPress={() => setFiltroActivo(filtro)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
-                {/* 🏷️ Sección de Categorías */}
-                <Text style={styles.sectionLabel}>DESTACADOS</Text>
-                <View style={styles.categoryGrid}>
-                  {CATEGORIES.map((cat) => (
-                    <TouchableOpacity key={cat.id} style={styles.categoryCard}>
-                      <View style={styles.catIconContainer}>
-                        <Text style={{ fontSize: 22 }}>{cat.icon}</Text>
-                      </View>
-                      <Text style={styles.categoryCardText}>{cat.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-                {/* 🥦 Sección de Ingredientes */}
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionLabel}>POR INGREDIENTE</Text>
-                  <TouchableOpacity><Text style={styles.seeAll}>Ver todos</Text></TouchableOpacity>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.ingredientScroll}>
-                  {INGREDIENTS.map((ing) => (
-                    <TouchableOpacity key={ing.id} style={styles.ingredientCircle}>
-                      <View style={styles.emojiBg}>
-                        <Text style={{ fontSize: 24 }}>{ing.emoji}</Text>
-                      </View>
-                      <Text style={styles.ingredientName}>{ing.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+        {query.trim().length > 0 ? (
+          /* ── Resultados ── */
+          loading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={colors.primary} size="large" />
+            </View>
+          ) : error ? (
+            /* ── Error de conexión ── */
+            <View style={styles.emptyState}>
+              <Feather name="wifi-off" size={40} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>No pudimos conectar</Text>
+              <Text style={styles.emptySubtitle}>Revisá tu conexión e intentá de nuevo.</Text>
+            </View>
+          ) : resultados.length > 0 ? (
+            <>
+              <Text style={styles.sectionLabel}>{resultados.length} resultado{resultados.length !== 1 ? 's' : ''}</Text>
+              <View style={styles.grid}>
+                {resultados.map(recipe => (
+                  <RecipeCard
+                    key={recipe.id}
+                    recipe={recipe}
+                    variant="compact"
+                    width={CARD_W}
+                    isLiked={isLiked(recipe.id)}
+                    onPress={() => router.push(`/recipe/${recipe.id}`)}
+                    onLike={() => toggleLike(recipe.id)}
+                  />
+                ))}
+              </View>
+            </>
+          ) : (
+            /* ── Sin resultados ── */
+            <View style={styles.emptyState}>
+              <Feather name="search" size={40} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>Sin resultados</Text>
+              <Text style={styles.emptySubtitle}>No encontramos recetas para "{query}"</Text>
+            </View>
+          )
+        ) : (
+          /* ── Estado inicial: recientes + ingredientes ── */
+          <>
+            <Text style={styles.sectionLabel}>Búsquedas recientes</Text>
+            <View style={styles.recentList}>
+              {RECIENTES.map(term => (
+                <Pressable
+                  key={term}
+                  onPress={() => setQuery(term)}
+                  accessibilityRole="button"
+                  style={styles.recentItem}
+                >
+                  <Feather name="clock" size={16} color={colors.textMuted} />
+                  <Text style={styles.recentText}>{term}</Text>
+                  <Feather name="arrow-right" size={16} color={colors.textMuted} />
+                </Pressable>
+              ))}
+            </View>
 
-                {/* 🕐 Búsquedas Recientes */}
-                <Text style={styles.sectionLabel}>RECIENTES</Text>
-                <View style={styles.historyContainer}>
-                  {['Pasta', 'Tacos', 'Ensalada'].map((term) => (
-                    <View key={term} style={styles.historyTag}>
-                      <Text style={styles.historyText}>{term}</Text>
-                    </View>
-                  ))}
-                </View>
+            <Text style={[styles.sectionLabel, styles.sectionLabelTop]}>Buscar por ingrediente</Text>
+            <View style={styles.ingredientesWrap}>
+              {INGREDIENTES.map(ing => (
+                <CategoryPill
+                  key={ing}
+                  label={ing}
+                  active={query === ing}
+                  onPress={() => setQuery(query === ing ? '' : ing)}
+                />
+              ))}
+            </View>
+          </>
+        )}
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surface,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
     backgroundColor: colors.surface,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    // Sombra sutil para darle profundidad
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
   },
-  headerTitle: {
+  title: {
     ...typography.displayL,
     color: colors.textPrimary,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
-  searchBox: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+    height: 48,
     backgroundColor: colors.bg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 50,
-    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
   },
-  searchInput: {
+  searchBarFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  input: {
     flex: 1,
-    marginLeft: 8,
     ...typography.bodyM,
     color: colors.textPrimary,
+    paddingVertical: 0,
   },
-  scrollBody: {
-    padding: 20,
-    paddingBottom: 100,
+  pillsScroll: {
+    marginHorizontal: -spacing.lg,   // cancela el padding del header para ir de borde a borde
+    marginTop: spacing.lg,
+  },
+  pillsRow: {
+    paddingHorizontal: spacing.lg,
+  },
+  content: {
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing['4xl'],
   },
   sectionLabel: {
     ...typography.label,
     color: colors.textSecondary,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  categoryGrid: {
+  recentList: {
+    gap: spacing.sm,
+  },
+  recentItem: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 32,
-  },
-  categoryCard: {
-    width: '48%',
-    backgroundColor: colors.primaryLight,
-    borderRadius: 16,
-    padding: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primaryMid,
-  },
-  catIconContainer: {
-    marginBottom: 8,
-  },
-  categoryCardText: {
-    ...typography.h3,
-    color: colors.primary,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  seeAll: {
-    ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  ingredientScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  ingredientCircle: {
-    alignItems: 'center',
-    marginRight: 24,
-  },
-  emojiBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    borderWidth: 1.5,
+    borderRadius: radius.md,
+    borderWidth: 1,
     borderColor: colors.border,
   },
-  ingredientName: {
-    ...typography.caption,
-    fontWeight: '600',
+  recentText: {
+    ...typography.bodyM,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  sectionLabelTop: {
+    marginTop: spacing.xl,
+  },
+  ingredientesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: CARD_GAP,
+    marginTop: spacing.md,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: spacing['4xl'],
+    gap: spacing.md,
+  },
+  emptyTitle: {
+    ...typography.h2,
     color: colors.textPrimary,
   },
-  historyContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  historyTag: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  historyText: {
-    ...typography.bodyS,
+  emptySubtitle: {
+    ...typography.bodyM,
     color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
