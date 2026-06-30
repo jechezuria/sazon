@@ -62,7 +62,7 @@ export default function HomeScreen() {
             <Text style={styles.headline}>{frase}</Text>
           </View>
           <Pressable
-            onPress={() => router.push('/likes')}
+            onPress={() => router.push('/(tabs)/favoritos')}
             accessibilityLabel="Mis me gusta"
             accessibilityRole="button"
             style={styles.likeBtn}
