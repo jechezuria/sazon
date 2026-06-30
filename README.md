@@ -18,7 +18,7 @@ Colaborador del proyecto. Se encarga de la implementación general de la app, la
 ### carpineiro17
 Colaborador del proyecto con foco en soporte técnico y mejora de funcionalidades. Participa en ajustes de la interfaz, validación de flujos y mantenimiento del producto.
 
-### joaquinolmed
+### Joaquin Olmedo
 Colaborador del proyecto orientado a revisión de producto y soporte de desarrollo. Aporta en la organización de la app, pruebas de uso y refinamiento de detalles.
 
 ## Tecnologías
