@@ -1,10 +1,18 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import React from 'react';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
+import { useAuth } from '../../context/AuthContext';
 
 export default function TabLayout() {
+  const { isAuthenticated } = useAuth();
+
+  // Si no está logueado, lo mandamos al login antes de mostrar las pestañas
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -52,7 +60,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="favoritos"
         options={{
-            href: null,
+          href: null,
         }}
       />
     </Tabs>
