@@ -144,7 +144,7 @@ export default function PerfilScreen() {
       >
         {/* ── PASO 2: Card de perfil ── */}
         {/* TouchableOpacity porque va a navegar a "Editar perfil" */}
-        <TouchableOpacity style={styles.profileCard} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.profileCard} activeOpacity={0.8} onPress={() => router.push('/perfil/editar')}>
           <Avatar name={user.name} />
 
           <View style={styles.profileInfo}>
@@ -181,7 +181,7 @@ export default function PerfilScreen() {
           <MenuItem
             icon="person-outline"
             label="Editar perfil"
-            onPress={() => {}}
+            onPress={() => router.push('/perfil/editar')}
           />
           <Separator />
           <MenuItem

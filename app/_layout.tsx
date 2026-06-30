@@ -16,6 +16,7 @@ export default function RootLayout() {
         <Stack.Screen name="crear/detalles"     options={{ headerShown: false }} />
         <Stack.Screen name="crear/ingredientes" options={{ headerShown: false }} />
         <Stack.Screen name="crear/pasos"        options={{ headerShown: false }} />
+        <Stack.Screen name="perfil/editar"     options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="dark" backgroundColor="transparent" translucent />
     </>
