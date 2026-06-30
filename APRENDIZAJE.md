@@ -4,6 +4,140 @@ Este archivo documenta qué hace cada parte del código que vamos construyendo, 
 
 ---
 
+## `app/(tabs)/buscar.tsx` — Primera conexión real al backend
+
+Esta pantalla es la primera en dejar de usar el mock data: la búsqueda ahora le pega al backend real (`GET /api/recipes?search=...`) en lugar de filtrar el array `MOCK_RECIPES` en memoria. El resto de la pantalla (recientes, ingredientes, likes) sigue igual que antes.
+
+### El problema de pegarle a una API en cada tecla
+
+Con el mock, `search(query)` era una función síncrona — corría instantáneo en el dispositivo. Ahora es una llamada de red, que tarda y tiene costo. Si dispararas una request por cada letra que escribe el usuario ("p", "po", "pol", "poll"...), mandarías 4 requests para escribir una palabra de 4 letras, casi todas inútiles porque el usuario sigue escribiendo.
+
+**La solución es debounce**: esperar un poco después de la última tecla antes de buscar.
+
+```tsx
+useEffect(() => {
+  const trimmed = query.trim();
+  if (trimmed.length === 0) { /* limpiar todo */ return; }
+
+  let cancelled = false;
+  setLoading(true);
+
+  const timeoutId = setTimeout(async () => {
+    try {
+      const data = await getRecipes({ search: trimmed });
+      if (!cancelled) setResultados(data);
+    } catch {
+      if (!cancelled) setError(true);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  }, 400);
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timeoutId);
+  };
+}, [query]);
+```
+
+> Cada vez que `query` cambia, React primero ejecuta la función de **cleanup** (el `return () => {...}`) del efecto anterior, y *después* corre el nuevo efecto. Como el cleanup hace `clearTimeout`, si el usuario escribe una letra nueva antes de que pasen los 400ms, el timeout viejo se cancela y arranca uno nuevo. Solo se dispara la request real cuando el usuario deja de tipear por 400ms.
+
+### El problema de las respuestas que llegan en el orden equivocado
+
+Incluso con debounce, dos requests pueden estar "en vuelo" al mismo tiempo (por ejemplo, si la red está lenta). Si la respuesta de una búsqueda vieja ("po") llega *después* de la respuesta de la búsqueda nueva ("pollo"), pisaría los resultados correctos con resultados viejos.
+
+```tsx
+let cancelled = false;
+...
+const timeoutId = setTimeout(async () => {
+  const data = await getRecipes({ search: trimmed });
+  if (!cancelled) setResultados(data);   // ← el chequeo clave
+  ...
+}, 400);
+
+return () => { cancelled = true; ... };
+```
+> `cancelled` es una variable capturada por el closure de ese efecto específico. Cuando el efecto se "limpia" (porque `query` volvió a cambiar), `cancelled` pasa a `true` *para esa instancia del efecto* — pero la respuesta de la request vieja, cuando finalmente llegue, va a revisar su propia copia de `cancelled` (que ahora es `true`) y va a decidir no actualizar el estado. Es un patrón estándar para evitar "race conditions" en componentes de React con datos async.
+
+### Tres estados de la UI en lugar de uno
+
+Con datos síncronos del mock solo había dos casos: "hay resultados" o "no hay resultados". Con una API real hay que sumar un tercero: **mientras se espera la respuesta** y **si la red falla**.
+
+```tsx
+loading ? (
+  <ActivityIndicator color={colors.primary} size="large" />
+) : error ? (
+  <Text>No pudimos conectar</Text>
+) : resultados.length > 0 ? (
+  <View style={styles.grid}>...</View>
+) : (
+  <Text>Sin resultados</Text>
+)
+```
+> Es importante no confundir "todavía no llegó la respuesta" con "la respuesta llegó y vino vacía" — son situaciones distintas para el usuario y necesitan mensajes distintos.
+
+---
+
+## `services/` — Capa de conexión al backend
+
+Esta carpeta es nueva y **todavía no se usa** en ninguna pantalla — las pantallas siguen usando `useRecipes`/`useLikes` con el mock data como hasta ahora. Es la capa lista para cuando decidamos reemplazar los datos mockeados por datos reales del backend (`backend-sazon`).
+
+### `services/config.ts` — la URL en un solo lugar
+
+```ts
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+```
+> Expo solo expone al código del cliente las variables de entorno que empiezan con `EXPO_PUBLIC_` — es una medida de seguridad para que no termines mandando un secreto del backend (como una API key) al bundle de la app por accidente.
+> El `??` es el operador de coalescencia nula: si la variable de entorno no está definida, usa `'http://localhost:4000'` como respaldo. Cuando el backend esté en Render, alcanza con cambiar el `.env` (o el valor por defecto) — ningún archivo de servicio necesita tocarse.
+
+### `services/apiClient.ts` — un solo wrapper sobre `fetch`
+
+```ts
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  ...
+}
+```
+> En lugar de llamar a `fetch` directamente desde cada servicio (y repetir el manejo de headers, JSON y errores 8 veces), todos los servicios pasan por esta única función. Si mañana hay que agregar, por ejemplo, un timeout global o loguear todas las requests, se cambia en un solo lugar.
+
+```ts
+export class ApiError extends Error {
+  status: number;
+  ...
+}
+```
+> Extender `Error` permite crear un tipo de error específico de la app. Así, quien use el servicio puede hacer `catch (err) { if (err instanceof ApiError && err.status === 401) ... }` y reaccionar distinto según el código HTTP, en lugar de parsear el mensaje de texto.
+
+```ts
+if (response.status === 204) {
+  return undefined as T;
+}
+```
+> El status `204 No Content` (lo devuelve por ejemplo un DELETE) no tiene body. Si se intentara hacer `response.json()` sobre una respuesta vacía, fallaría — por eso se corta antes.
+
+### `services/recipes.service.ts` — filtros como query params
+
+```ts
+function buildQuery(filters: RecipeFilters): string {
+  const params = new URLSearchParams();
+  if (filters.category) params.set('category', filters.category);
+  ...
+  return query ? `?${query}` : '';
+}
+```
+> `URLSearchParams` arma el string de query (`?category=Postre&search=avena`) escapando caracteres especiales automáticamente (espacios, tildes, etc.) — más seguro que concatenar strings a mano.
+> Los filtros son todos opcionales (`category?`, `difficulty?`) — si no se pasa ninguno, `getRecipes()` sin argumentos trae todas las recetas, igual que `useRecipes().getAll()` hace hoy con el mock.
+
+### Por qué el token se pasa como parámetro y no se guarda solo
+
+```ts
+export function getMyLikedRecipes(token: string): Promise<Recipe[]> {
+  return apiRequest<Recipe[]>('/api/recipes/liked/mine', { token });
+}
+```
+> Estos servicios son funciones puras: no saben de dónde viene el token ni dónde se guarda (`AsyncStorage`, `SecureStore`, un Context de React, etc.). Esa decisión se toma en otra capa, todavía no construida, que maneje la sesión del usuario. Mantener los servicios "tontos" (solo saben hablar HTTP) hace que sean fáciles de testear y de reutilizar sin importar cómo se resuelva el login más adelante.
+
+---
+
 ## Estructura general del proyecto
 
 ```

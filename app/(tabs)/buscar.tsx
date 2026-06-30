@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Pressable,
   ScrollView,
@@ -16,8 +17,11 @@ import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { CategoryPill } from '@/components/molecules/CategoryPill';
 import { RecipeCard } from '@/components/molecules/RecipeCard';
-import { useRecipes } from '@/hooks/useRecipes';
 import { useLikes } from '@/hooks/useLikes';
+import { getRecipes } from '@/services/recipes.service';
+import { Recipe } from '@/types';
+
+const SEARCH_DEBOUNCE_MS = 400;
 
 const SCREEN_W = Dimensions.get('window').width;
 const CARD_GAP = spacing.md;
@@ -36,12 +40,41 @@ export default function BuscarScreen() {
   const [filtroActivo, setFiltroActivo] = useState('Todo');
   const inputRef = useRef<TextInput>(null);
 
-  const { search } = useRecipes();
   const { toggleLike, isLiked } = useLikes();
 
-  const resultados = useMemo(() => {
-    if (query.trim().length === 0) return [];
-    return search(query.trim());
+  const [resultados, setResultados] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
+      setResultados([]);
+      setLoading(false);
+      setError(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+
+    // Debounce: espera a que el usuario deje de tipear antes de pegarle a la API
+    const timeoutId = setTimeout(async () => {
+      try {
+        const data = await getRecipes({ search: trimmed });
+        if (!cancelled) setResultados(data);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [query]);
 
   return (
@@ -98,7 +131,18 @@ export default function BuscarScreen() {
 
         {query.trim().length > 0 ? (
           /* ── Resultados ── */
-          resultados.length > 0 ? (
+          loading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={colors.primary} size="large" />
+            </View>
+          ) : error ? (
+            /* ── Error de conexión ── */
+            <View style={styles.emptyState}>
+              <Feather name="wifi-off" size={40} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>No pudimos conectar</Text>
+              <Text style={styles.emptySubtitle}>Revisá tu conexión e intentá de nuevo.</Text>
+            </View>
+          ) : resultados.length > 0 ? (
             <>
               <Text style={styles.sectionLabel}>{resultados.length} resultado{resultados.length !== 1 ? 's' : ''}</Text>
               <View style={styles.grid}>
