@@ -23,6 +23,7 @@ function newIngredient(): IngredientDraft {
 
 export default function CrearIngredientesScreen() {
   const router = useRouter();
+  const editMode = recipeFormStore.get().editMode;
 
   const [ingredients, setIngredients] = useState<IngredientDraft[]>(
     recipeFormStore.get().ingredients
@@ -58,7 +59,7 @@ export default function CrearIngredientesScreen() {
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Volver">
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[typography.h1, { color: colors.textPrimary }]}>Crear receta</Text>
+        <Text style={[typography.h1, { color: colors.textPrimary }]}>{editMode ? 'Editar receta' : 'Crear receta'}</Text>
         <View style={{ width: 24 }} />
       </View>
 

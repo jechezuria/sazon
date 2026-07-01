@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { useRecipeProgressContext } from "@/context/RecipeProgressContext";
 import { colors } from "@/theme/colors";
 import { shadows } from "@/theme/shadows";
 import { typography } from "@/theme/typography";
@@ -76,6 +77,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function PerfilScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { clearAll: clearProgress } = useRecipeProgressContext();
 
   async function handleLogout() {
     Alert.alert("Cerrar sesión", "¿Estás seguro que querés cerrar sesión?", [
@@ -84,6 +86,7 @@ export default function PerfilScreen() {
         text: "Cerrar sesión",
         style: "destructive",
         onPress: async () => {
+          clearProgress();
           await logout();
           router.replace("/login");
         },

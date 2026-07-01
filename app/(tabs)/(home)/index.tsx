@@ -18,15 +18,16 @@ const SCREEN_W = Dimensions.get('window').width;
 const CARD_GAP = spacing.md;
 const CARD_W = (SCREEN_W - spacing.lg * 2 - CARD_GAP) / 2;
 
-const CATEGORIAS = ['Todas', 'Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Postres'];
+const CATEGORIAS = ['Todas', 'Desayuno', 'Almuerzo', 'Cena', 'Postre', 'Snack', 'Vegetariano'];
 
 const CATEGORIA_MAP: Record<string, Category | null> = {
-  'Todas':    null,
-  'Desayuno': 'Desayuno',
-  'Almuerzo': 'Almuerzo',
-  'Merienda': 'Snack',
-  'Cena':     'Cena',
-  'Postres':  'Postre',
+  'Todas':       null,
+  'Desayuno':    'Desayuno',
+  'Almuerzo':    'Almuerzo',
+  'Cena':        'Cena',
+  'Postre':      'Postre',
+  'Snack':       'Snack',
+  'Vegetariano': 'Vegetariano',
 };
 
 const FRASES = [
@@ -106,7 +107,7 @@ export default function HomeScreen() {
                 width={CARD_W}
                 isLiked={isLiked(recipe.id)}
                 onPress={() => router.push(`/recipe/${recipe.id}`)}
-                onLike={() => toggleLike(recipe.id)}
+                onLike={() => toggleLike(recipe.id, recipe)}
               />
             ))}
           </View>

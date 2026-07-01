@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -19,7 +20,10 @@ import { CategoryPill } from '@/components/molecules/CategoryPill';
 import { RecipeCard } from '@/components/molecules/RecipeCard';
 import { useLikes } from '@/hooks/useLikes';
 import { getRecipes } from '@/services/recipes.service';
-import { Recipe } from '@/types';
+import { Category, Difficulty, Recipe } from '@/types';
+
+const RECENT_KEY = '@sazon:recent_searches';
+const MAX_RECIENTES = 5;
 
 const SEARCH_DEBOUNCE_MS = 400;
 
@@ -27,17 +31,17 @@ const SCREEN_W = Dimensions.get('window').width;
 const CARD_GAP = spacing.md;
 const CARD_W = (SCREEN_W - spacing.lg * 2 - CARD_GAP) / 2;
 
-const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
-
-const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
-
+const FILTROS: Array<'Todas' | Category> = ['Todas', 'Desayuno', 'Almuerzo', 'Cena', 'Postre', 'Snack', 'Vegetariano'];
+const DIFICULTADES: Difficulty[] = ['Fácil', 'Medio', 'Difícil'];
 const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arroz', 'Queso'];
 
 export default function BuscarScreen() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
-  const [filtroActivo, setFiltroActivo] = useState('Todo');
+  const [filtroActivo, setFiltroActivo] = useState<'Todas' | Category>('Todas');
+  const [dificultadActiva, setDificultadActiva] = useState<Difficulty | null>(null);
+  const [recientes, setRecientes] = useState<string[]>([]);
   const inputRef = useRef<TextInput>(null);
 
   const { toggleLike, isLiked } = useLikes();
@@ -45,6 +49,19 @@ export default function BuscarScreen() {
   const [resultados, setResultados] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+
+  // Cargar búsquedas recientes al montar
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_KEY).then(raw => {
+      if (raw) setRecientes(JSON.parse(raw));
+    });
+  }, []);
+
+  async function guardarReciente(term: string) {
+    const updated = [term, ...recientes.filter(r => r !== term)].slice(0, MAX_RECIENTES);
+    setRecientes(updated);
+    await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+  }
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -59,10 +76,14 @@ export default function BuscarScreen() {
     setLoading(true);
     setError(false);
 
-    // Debounce: espera a que el usuario deje de tipear antes de pegarle a la API
     const timeoutId = setTimeout(async () => {
+      guardarReciente(trimmed);
       try {
-        const data = await getRecipes({ search: trimmed });
+        const data = await getRecipes({
+          search: trimmed,
+          category: filtroActivo !== 'Todas' ? filtroActivo : undefined,
+          difficulty: dificultadActiva ?? undefined,
+        });
         if (!cancelled) setResultados(data);
       } catch {
         if (!cancelled) setError(true);
@@ -75,15 +96,19 @@ export default function BuscarScreen() {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [query]);
+  }, [query, filtroActivo, dificultadActiva]);
 
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Buscar recetas</Text>
+        <View style={styles.titleRow}>
+          <Pressable onPress={() => router.navigate('/')} accessibilityLabel="Volver al inicio">
+            <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={styles.title}>Buscar recetas</Text>
+        </View>
 
-        {/* Barra de búsqueda — real TextInput, no decorativa */}
         <Pressable onPress={() => inputRef.current?.focus()} style={[styles.searchBar, focused && styles.searchBarFocused]}>
           <Feather
             name="search"
@@ -109,7 +134,7 @@ export default function BuscarScreen() {
           )}
         </Pressable>
 
-        {/* Pills de filtro — dentro del header para mantener el fondo blanco */}
+        {/* Pills de categoría */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -136,7 +161,6 @@ export default function BuscarScreen() {
               <ActivityIndicator color={colors.primary} size="large" />
             </View>
           ) : error ? (
-            /* ── Error de conexión ── */
             <View style={styles.emptyState}>
               <Feather name="wifi-off" size={40} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>No pudimos conectar</Text>
@@ -154,13 +178,12 @@ export default function BuscarScreen() {
                     width={CARD_W}
                     isLiked={isLiked(recipe.id)}
                     onPress={() => router.push(`/recipe/${recipe.id}`)}
-                    onLike={() => toggleLike(recipe.id)}
+                    onLike={() => toggleLike(recipe.id, recipe)}
                   />
                 ))}
               </View>
             </>
           ) : (
-            /* ── Sin resultados ── */
             <View style={styles.emptyState}>
               <Feather name="search" size={40} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>Sin resultados</Text>
@@ -168,23 +191,27 @@ export default function BuscarScreen() {
             </View>
           )
         ) : (
-          /* ── Estado inicial: recientes + ingredientes ── */
+          /* ── Estado inicial: recientes + ingredientes + dificultad ── */
           <>
-            <Text style={styles.sectionLabel}>Búsquedas recientes</Text>
-            <View style={styles.recentList}>
-              {RECIENTES.map(term => (
-                <Pressable
-                  key={term}
-                  onPress={() => setQuery(term)}
-                  accessibilityRole="button"
-                  style={styles.recentItem}
-                >
-                  <Feather name="clock" size={16} color={colors.textMuted} />
-                  <Text style={styles.recentText}>{term}</Text>
-                  <Feather name="arrow-right" size={16} color={colors.textMuted} />
-                </Pressable>
-              ))}
-            </View>
+            {recientes.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>Búsquedas recientes</Text>
+                <View style={styles.recentList}>
+                  {recientes.map(term => (
+                    <Pressable
+                      key={term}
+                      onPress={() => setQuery(term)}
+                      accessibilityRole="button"
+                      style={styles.recentItem}
+                    >
+                      <Feather name="clock" size={16} color={colors.textMuted} />
+                      <Text style={styles.recentText}>{term}</Text>
+                      <Feather name="arrow-right" size={16} color={colors.textMuted} />
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
 
             <Text style={[styles.sectionLabel, styles.sectionLabelTop]}>Buscar por ingrediente</Text>
             <View style={styles.ingredientesWrap}>
@@ -194,6 +221,18 @@ export default function BuscarScreen() {
                   label={ing}
                   active={query === ing}
                   onPress={() => setQuery(query === ing ? '' : ing)}
+                />
+              ))}
+            </View>
+
+            <Text style={[styles.sectionLabel, styles.sectionLabelTop]}>Buscar por dificultad</Text>
+            <View style={styles.ingredientesWrap}>
+              {DIFICULTADES.map(dif => (
+                <CategoryPill
+                  key={dif}
+                  label={dif}
+                  active={dificultadActiva === dif}
+                  onPress={() => setDificultadActiva(prev => (prev === dif ? null : dif))}
                 />
               ))}
             </View>
@@ -223,10 +262,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
   title: {
     ...typography.displayL,
     color: colors.textPrimary,
-    marginBottom: spacing.lg,
   },
   searchBar: {
     flexDirection: 'row',
@@ -250,7 +294,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   pillsScroll: {
-    marginHorizontal: -spacing.lg,   // cancela el padding del header para ir de borde a borde
+    marginHorizontal: -spacing.lg,
     marginTop: spacing.lg,
   },
   pillsRow: {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,18 +38,32 @@ export function RecipeCard({
   return <FullCard recipe={recipe} isLiked={isLiked} onPress={onPress} onLike={onLike} width={width} />;
 }
 
+function ImagePlaceholder({ height, width }: { height: number; width?: number | string }) {
+  return (
+    <View style={[styles.imagePlaceholder, { height, width: width as any }]}>
+      <Ionicons name="image-outline" size={32} color={colors.primaryMid} />
+    </View>
+  );
+}
+
 function FullCard({ recipe, isLiked, onPress, onLike, width }: Omit<RecipeCardProps, 'variant'>) {
   const cardWidth = width ?? SCREEN_W - spacing.lg * 2;
   const imageHeight = Math.round(cardWidth * (2 / 3));
+  const [imgError, setImgError] = useState(false);
 
   return (
     <Pressable onPress={onPress} style={[styles.fullCard, { width: cardWidth }, shadows.card]}>
-      <Image
-        source={{ uri: recipe.imageUrl }}
-        style={[styles.fullImage, { height: imageHeight }]}
-        contentFit="cover"
-        placeholder={{ color: colors.primaryLight }}
-      />
+      {recipe.imageUrl && !imgError ? (
+        <Image
+          source={{ uri: recipe.imageUrl }}
+          style={[styles.fullImage, { height: imageHeight }]}
+          contentFit="cover"
+          placeholder={{ color: colors.primaryLight }}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <ImagePlaceholder height={imageHeight} width="100%" />
+      )}
       <LinearGradient
         colors={['transparent', colors.overlayDark]}
         style={[StyleSheet.absoluteFill, { borderRadius: radius.lg }]}
@@ -94,15 +108,21 @@ function FullCard({ recipe, isLiked, onPress, onLike, width }: Omit<RecipeCardPr
 function CompactCard({ recipe, isLiked, onPress, onLike, width }: Omit<RecipeCardProps, 'variant'>) {
   const cardWidth = width ?? (SCREEN_W - spacing.lg * 2 - spacing.md) / 2;
   const imageHeight = Math.round(cardWidth * (2 / 3));
+  const [imgError, setImgError] = useState(false);
 
   return (
     <Pressable onPress={onPress} style={[styles.compactCard, { width: cardWidth }, shadows.card]}>
-      <Image
-        source={{ uri: recipe.imageUrl }}
-        style={[styles.compactImage, { height: imageHeight }]}
-        contentFit="cover"
-        placeholder={{ color: colors.primaryLight }}
-      />
+      {recipe.imageUrl && !imgError ? (
+        <Image
+          source={{ uri: recipe.imageUrl }}
+          style={[styles.compactImage, { height: imageHeight }]}
+          contentFit="cover"
+          placeholder={{ color: colors.primaryLight }}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <ImagePlaceholder height={imageHeight} width="100%" />
+      )}
       {onLike && (
         <Pressable
           onPress={onLike}
@@ -126,6 +146,11 @@ function CompactCard({ recipe, isLiked, onPress, onLike, width }: Omit<RecipeCar
 }
 
 const styles = StyleSheet.create({
+  imagePlaceholder: {
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fullCard: {
     borderRadius: radius.lg,
     overflow: 'hidden',

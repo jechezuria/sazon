@@ -6,7 +6,7 @@ import { Recipe } from '@/types';
 interface LikesContextValue {
   likedIds: Set<string>;
   likedRecipes: Recipe[];
-  toggleLike: (id: string) => Promise<void>;
+  toggleLike: (id: string, recipe?: Recipe) => Promise<void>;
   isLiked: (id: string) => boolean;
   loading: boolean;
 }
@@ -36,39 +36,37 @@ export function LikesProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, [token]);
 
-  async function toggleLike(id: string) {
+  async function toggleLike(id: string, recipe?: Recipe) {
     if (!token) return;
 
-    // Actualización optimista: cambia la UI antes de esperar la respuesta del backend
     const wasLiked = likedIds.has(id);
+
+    // Actualización optimista instantánea — no re-fetch, evita flickering
     setLikedIds(prev => {
       const next = new Set(prev);
       wasLiked ? next.delete(id) : next.add(id);
       return next;
     });
-    if (wasLiked) {
-      setLikedRecipes(prev => prev.filter(r => r.id !== id));
-    }
+    setLikedRecipes(prev => {
+      if (wasLiked) return prev.filter(r => r.id !== id);
+      if (recipe) return [recipe, ...prev];
+      return prev;
+    });
 
     try {
       await toggleRecipeLike(id, token);
-      // Sincroniza el estado real del backend (incluye la receta completa si fue agregada)
-      const updated = await getMyLikedRecipes(token);
-      setLikedRecipes(updated);
-      setLikedIds(new Set(updated.map(r => r.id)));
     } catch {
-      // Revierte el cambio optimista si la llamada falla
+      // Revierte si el backend falla
       setLikedIds(prev => {
         const next = new Set(prev);
         wasLiked ? next.add(id) : next.delete(id);
         return next;
       });
-      if (wasLiked) {
-        getMyLikedRecipes(token).then(rs => {
-          setLikedRecipes(rs);
-          setLikedIds(new Set(rs.map(r => r.id)));
-        }).catch(() => {});
-      }
+      setLikedRecipes(prev => {
+        if (!wasLiked) return prev.filter(r => r.id !== id);
+        if (wasLiked && recipe) return [recipe, ...prev];
+        return prev;
+      });
     }
   }
 

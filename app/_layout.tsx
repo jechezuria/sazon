@@ -1,5 +1,6 @@
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { LikesProvider } from "@/context/LikesContext";
+import { RecipeProgressProvider } from "@/context/RecipeProgressContext";
 import { colors } from "@/theme/colors";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -61,7 +62,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <RecipeProgressProvider>
+        <RootNavigator />
+      </RecipeProgressProvider>
     </AuthProvider>
   );
 }

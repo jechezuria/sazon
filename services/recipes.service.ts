@@ -56,6 +56,30 @@ export function createRecipe(input: CreateRecipeInput): Promise<Recipe> {
   });
 }
 
+export interface UpdateRecipeInput {
+  title: string;
+  description: string;
+  imageUrl: string;
+  category: Category;
+  difficulty: Difficulty;
+  cookTime: string;
+  servings: number;
+  tags: string[];
+  ingredients: { name: string; amount: string }[];
+  steps: { description: string; order: number }[];
+}
+
+export function updateRecipe(id: string, input: UpdateRecipeInput): Promise<Recipe> {
+  return apiRequest<Recipe>(`/api/recipes/${id}`, {
+    method: 'PUT',
+    body: input,
+  });
+}
+
+export function deleteRecipe(id: string): Promise<void> {
+  return apiRequest<void>(`/api/recipes/${id}`, { method: 'DELETE' });
+}
+
 // POST /api/recipes/:id/like — requiere token. Toggle: alterna el estado de like.
 export function toggleRecipeLike(recipeId: string, token: string): Promise<{ liked: boolean }> {
   return apiRequest<{ liked: boolean }>(`/api/recipes/${recipeId}/like`, {

@@ -62,7 +62,7 @@ export default function FavoritosScreen() {
                 width={CARD_W}
                 isLiked={isLiked(recipe.id)}
                 onPress={() => router.push(`/recipe/${recipe.id}`)}
-                onLike={() => toggleLike(recipe.id)}
+                onLike={() => toggleLike(recipe.id, recipe)}
               />
             ))}
           </View>

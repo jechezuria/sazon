@@ -20,7 +20,7 @@ import { shadows } from '@/theme/shadows';
 import { recipeFormStore, StepDraft } from '@/store/recipeFormStore';
 import { StepperBar } from '@/components/atoms/StepperBar';
 import { useAuth } from '@/context/AuthContext';
-import { createRecipe } from '@/services/recipes.service';
+import { createRecipe, updateRecipe } from '@/services/recipes.service';
 import { invalidateRecipesCache } from '@/hooks/useRecipes';
 import { Category, Difficulty } from '@/types';
 
@@ -31,6 +31,7 @@ function newStep(): StepDraft {
 export default function CrearPasosScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { editMode, editRecipeId } = recipeFormStore.get();
 
   const [steps, setSteps] = useState<StepDraft[]>(
     recipeFormStore.get().steps
@@ -60,31 +61,54 @@ export default function CrearPasosScreen() {
     recipeFormStore.update({ steps });
     const data = recipeFormStore.get();
 
+    const filteredIngredients = data.ingredients
+      .filter((i) => i.name.trim())
+      .map(({ name, amount }) => ({ name, amount }));
+    const filteredSteps = steps
+      .filter((s) => s.description.trim())
+      .map((s, index) => ({ description: s.description, order: index + 1 }));
+
     setSubmitting(true);
     try {
-      await createRecipe({
-        title: data.title,
-        description: data.description,
-        imageUrl: data.imageUri || '',
-        category: data.category as Category,
-        difficulty: data.difficulty as Difficulty,
-        cookTime: data.cookTime,
-        servings: parseInt(data.servings, 10) || 1,
-        tags: [],
-        authorId: user.id,
-        ingredients: data.ingredients
-          .filter((i) => i.name.trim())
-          .map(({ name, amount }) => ({ name, amount })),
-        steps: steps
-          .filter((s) => s.description.trim())
-          .map((s, index) => ({ description: s.description, order: index + 1 })),
-      });
-
-      invalidateRecipesCache();
-      recipeFormStore.reset();
-      router.replace('/(tabs)/perfil');
+      if (editMode && editRecipeId) {
+        await updateRecipe(editRecipeId, {
+          title: data.title,
+          description: data.description,
+          imageUrl: data.imageUri || '',
+          category: data.category as Category,
+          difficulty: data.difficulty as Difficulty,
+          cookTime: data.cookTime,
+          servings: parseInt(data.servings, 10) || 1,
+          tags: [],
+          ingredients: filteredIngredients,
+          steps: filteredSteps,
+        });
+        invalidateRecipesCache();
+        recipeFormStore.reset();
+        router.replace(`/recipe/${editRecipeId}`);
+      } else {
+        await createRecipe({
+          title: data.title,
+          description: data.description,
+          imageUrl: data.imageUri || '',
+          category: data.category as Category,
+          difficulty: data.difficulty as Difficulty,
+          cookTime: data.cookTime,
+          servings: parseInt(data.servings, 10) || 1,
+          tags: [],
+          authorId: user.id,
+          ingredients: filteredIngredients,
+          steps: filteredSteps,
+        });
+        invalidateRecipesCache();
+        recipeFormStore.reset();
+        router.replace('/(tabs)/perfil');
+      }
     } catch (e: any) {
-      Alert.alert('Error al publicar', e.message ?? 'No se pudo publicar la receta. Intentá de nuevo.');
+      Alert.alert(
+        editMode ? 'Error al guardar' : 'Error al publicar',
+        e.message ?? 'No se pudo guardar la receta. Intentá de nuevo.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -98,7 +122,7 @@ export default function CrearPasosScreen() {
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Volver">
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[typography.h1, { color: colors.textPrimary }]}>Crear receta</Text>
+        <Text style={[typography.h1, { color: colors.textPrimary }]}>{editMode ? 'Editar receta' : 'Crear receta'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -175,7 +199,7 @@ export default function CrearPasosScreen() {
                   color={colors.surface}
                   style={{ marginRight: 8 }}
                 />
-                <Text style={styles.publishBtnText}>Publicar receta</Text>
+                <Text style={styles.publishBtnText}>{editMode ? 'Guardar cambios' : 'Publicar receta'}</Text>
               </>
             )}
           </TouchableOpacity>

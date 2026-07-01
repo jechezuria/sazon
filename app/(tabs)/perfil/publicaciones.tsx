@@ -135,7 +135,7 @@ export default function MisPublicacionesScreen() {
                 width={CARD_W}
                 isLiked={isLiked(recipe.id)}
                 onPress={() => router.push(`/recipe/${recipe.id}`)}
-                onLike={() => toggleLike(recipe.id)}
+                onLike={() => toggleLike(recipe.id, recipe)}
               />
             ))}
           </View>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +10,10 @@ import { typography } from '@/theme/typography';
 import { useRecipe } from '@/hooks/useRecipes';
 import { useLikes } from '@/hooks/useLikes';
 import { useRecipeProgress } from '@/hooks/useRecipeProgress';
+import { useAuth } from '@/context/AuthContext';
+import { recipeFormStore } from '@/store/recipeFormStore';
+import { deleteRecipe } from '@/services/recipes.service';
+import { invalidateRecipesCache } from '@/hooks/useRecipes';
 
 function SmallAvatar({ name }: { name: string }) {
   const initials = name
@@ -47,9 +51,60 @@ export default function RecipeDetailScreen() {
   const insets = useSafeAreaInsets();
   const { recipe, loading, error } = useRecipe(id as string);
   const { isLiked, toggleLike } = useLikes();
+  const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<Tab>('ingredientes');
   const { checkedIngredients, checkedSteps, toggleIngredient, toggleStep } = useRecipeProgress(id as string);
+
+  const isOwner = !!user && !!recipe && recipe.author.id === user.id;
+
+  function handleDelete() {
+    Alert.alert(
+      'Eliminar receta',
+      '¿Estás seguro que querés eliminar esta receta? Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRecipe(recipe!.id);
+              invalidateRecipesCache();
+              router.replace('/(tabs)/(home)');
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'No se pudo eliminar la receta.');
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleEdit() {
+    if (!recipe) return;
+    recipeFormStore.update({
+      editMode:     true,
+      editRecipeId: recipe.id,
+      title:        recipe.title,
+      description:  recipe.description,
+      imageUri:     recipe.imageUrl,
+      category:     recipe.category,
+      difficulty:   recipe.difficulty,
+      cookTime:     recipe.cookTime,
+      servings:     String(recipe.servings),
+      ingredients:  recipe.ingredients.map((ing, i) => ({
+        id: String(i + 1),
+        name: ing.name,
+        amount: ing.amount,
+      })),
+      steps: recipe.steps.map((s, i) => ({
+        id: String(i + 1),
+        description: s.description,
+      })),
+    });
+    router.push('/crear/detalles');
+  }
 
   if (loading) {
     return (
@@ -80,17 +135,29 @@ export default function RecipeDetailScreen() {
           <TouchableOpacity style={styles.heroBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.heroBtn}
-            onPress={() => toggleLike(recipe.id)}
-            accessibilityLabel={isLiked(recipe.id) ? 'Quitar me gusta' : 'Me gusta'}
-          >
-            <Ionicons
-              name={isLiked(recipe.id) ? 'heart' : 'heart-outline'}
-              size={20}
-              color={isLiked(recipe.id) ? colors.error : colors.textPrimary}
-            />
-          </TouchableOpacity>
+          <View style={styles.heroBtnGroup}>
+            {isOwner && (
+              <>
+                <TouchableOpacity style={styles.heroBtn} onPress={handleDelete} accessibilityLabel="Eliminar receta">
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.heroBtn} onPress={handleEdit} accessibilityLabel="Editar receta">
+                  <Ionicons name="create-outline" size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity
+              style={styles.heroBtn}
+              onPress={() => toggleLike(recipe.id, recipe)}
+              accessibilityLabel={isLiked(recipe.id) ? 'Quitar me gusta' : 'Me gusta'}
+            >
+              <Ionicons
+                name={isLiked(recipe.id) ? 'heart' : 'heart-outline'}
+                size={20}
+                color={isLiked(recipe.id) ? colors.error : colors.textPrimary}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -172,6 +239,7 @@ const styles = StyleSheet.create({
   heroImage: { width: '100%', aspectRatio: 4 / 3 },
   heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 140 },
   heroButtons: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  heroBtnGroup: { flexDirection: 'row', gap: 8 },
   heroBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
   panel: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -24, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
   title: { ...typography.displayL, color: colors.textPrimary },

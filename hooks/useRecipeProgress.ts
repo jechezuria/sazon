@@ -1,50 +1,33 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
-
-const key = (id: string) => `@sazon:progress:${id}`;
+import { useCallback, useState } from 'react';
+import { useRecipeProgressContext } from '@/context/RecipeProgressContext';
 
 export function useRecipeProgress(recipeId: string) {
-  const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(new Set());
-  const [checkedSteps, setCheckedSteps] = useState<Set<string>>(new Set());
+  const { getProgress, toggleIngredient: ctxToggleIngredient, toggleStep: ctxToggleStep } = useRecipeProgressContext();
 
-  useEffect(() => {
-    AsyncStorage.getItem(key(recipeId))
-      .then(raw => {
-        if (!raw) return;
-        const { ingredientIds, stepIds } = JSON.parse(raw) as {
-          ingredientIds: string[];
-          stepIds: string[];
-        };
-        setCheckedIngredients(new Set(ingredientIds));
-        setCheckedSteps(new Set(stepIds));
-      })
-      .catch(() => {});
-  }, [recipeId]);
+  // Inicializa desde el contexto (persiste si el usuario navega y vuelve)
+  const saved = getProgress(recipeId);
+  const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(() => new Set(saved.ingredientIds));
+  const [checkedSteps, setCheckedSteps] = useState<Set<string>>(() => new Set(saved.stepIds));
 
-  function persist(ingredients: Set<string>, steps: Set<string>) {
-    AsyncStorage.setItem(
-      key(recipeId),
-      JSON.stringify({ ingredientIds: [...ingredients], stepIds: [...steps] })
-    ).catch(() => {});
-  }
-
-  function toggleIngredient(id: string) {
+  const toggleIngredient = useCallback((id: string) => {
+    // Actualiza el contexto (persistencia entre navegaciones)
+    ctxToggleIngredient(recipeId, id);
+    // Actualiza el estado local (rerenderiza la pantalla de inmediato)
     setCheckedIngredients(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      persist(next, checkedSteps);
       return next;
     });
-  }
+  }, [recipeId, ctxToggleIngredient]);
 
-  function toggleStep(id: string) {
+  const toggleStep = useCallback((id: string) => {
+    ctxToggleStep(recipeId, id);
     setCheckedSteps(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      persist(checkedIngredients, next);
       return next;
     });
-  }
+  }, [recipeId, ctxToggleStep]);
 
   return { checkedIngredients, checkedSteps, toggleIngredient, toggleStep };
 }
