@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '@/theme/colors';
@@ -50,6 +50,16 @@ export default function BuscarScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
+  // Resetear filtros y resultados cada vez que la pantalla gana el foco
+  useFocusEffect(
+    useCallback(() => {
+      setQuery('');
+      setDificultadActiva(null);
+      setResultados([]);
+      setError(false);
+    }, [])
+  );
+
   // Cargar búsquedas recientes al montar
   useEffect(() => {
     AsyncStorage.getItem(RECENT_KEY).then(raw => {
@@ -65,7 +75,9 @@ export default function BuscarScreen() {
 
   useEffect(() => {
     const trimmed = query.trim();
-    if (trimmed.length === 0) {
+    const hayFiltro = dificultadActiva !== null || filtroActivo !== 'Todas';
+
+    if (trimmed.length === 0 && !hayFiltro) {
       setResultados([]);
       setLoading(false);
       setError(false);
@@ -77,10 +89,10 @@ export default function BuscarScreen() {
     setError(false);
 
     const timeoutId = setTimeout(async () => {
-      guardarReciente(trimmed);
+      if (trimmed.length > 0) guardarReciente(trimmed);
       try {
         const data = await getRecipes({
-          search: trimmed,
+          search: trimmed.length > 0 ? trimmed : undefined,
           category: filtroActivo !== 'Todas' ? filtroActivo : undefined,
           difficulty: dificultadActiva ?? undefined,
         });
@@ -154,9 +166,23 @@ export default function BuscarScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {query.trim().length > 0 ? (
+        {(query.trim().length > 0 || dificultadActiva !== null) ? (
           /* ── Resultados ── */
-          loading ? (
+          <>
+          {/* Chips de dificultad visibles cuando no hay texto, para poder deseleccionar */}
+          {query.trim().length === 0 && (
+            <View style={[styles.ingredientesWrap, { marginBottom: spacing.lg }]}>
+              {DIFICULTADES.map(dif => (
+                <CategoryPill
+                  key={dif}
+                  label={dif}
+                  active={dificultadActiva === dif}
+                  onPress={() => setDificultadActiva(prev => prev === dif ? null : dif)}
+                />
+              ))}
+            </View>
+          )}
+          {loading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator color={colors.primary} size="large" />
             </View>
@@ -187,9 +213,14 @@ export default function BuscarScreen() {
             <View style={styles.emptyState}>
               <Feather name="search" size={40} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>Sin resultados</Text>
-              <Text style={styles.emptySubtitle}>No encontramos recetas para "{query}"</Text>
+              <Text style={styles.emptySubtitle}>
+                {query.trim().length > 0
+                  ? `No encontramos recetas para "${query}"`
+                  : `No hay recetas con dificultad "${dificultadActiva}"`}
+              </Text>
             </View>
-          )
+          )}
+          </>
         ) : (
           /* ── Estado inicial: recientes + ingredientes + dificultad ── */
           <>
