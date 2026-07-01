@@ -19,19 +19,10 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/AuthContext';
 import { register } from '@/services/auth.service';
+import { validatePassword } from '@/utils/validatePassword';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
-
-// ─── Validación de contraseña ─────────────────────────────────────────────────
-function validatePassword(pwd: string) {
-  return {
-    minLength:    pwd.length >= 8,
-    hasLetter:    /[a-zA-Z]/.test(pwd),
-    hasNumber:    /[0-9]/.test(pwd),
-    alphanumeric: /^[a-zA-Z0-9]*$/.test(pwd) && pwd.length > 0,
-  };
-}
 
 function Requisito({ cumplido, texto }: { cumplido: boolean; texto: string }) {
   return (
