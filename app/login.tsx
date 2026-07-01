@@ -35,7 +35,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login({ email: email.trim(), password });
-      // _layout.tsx detecta el cambio de token y redirige a /(tabs) automáticamente
+      router.replace('/(tabs)');
     } catch (e: any) {
       setError(e.message ?? 'Error al iniciar sesión');
     } finally {
@@ -113,13 +113,6 @@ export default function LoginScreen() {
             <Pressable onPress={() => router.push('/register')}>
               <Text style={styles.registerLink}> Registrate</Text>
             </Pressable>
-          </View>
-
-          {/* Hint de usuarios de prueba */}
-          <View style={styles.hint}>
-            <Text style={styles.hintTitle}>Usuarios de prueba:</Text>
-            <Text style={styles.hintText}>sofia@sazon.app  /  sazon123</Text>
-            <Text style={styles.hintText}>marco@sazon.app  /  sazon123</Text>
           </View>
 
         </ScrollView>
@@ -216,22 +209,5 @@ const styles = StyleSheet.create({
     ...typography.bodyM,
     color: colors.primary,
     fontWeight: '700',
-  },
-  hint: {
-    marginTop: spacing['4xl'],
-    padding: spacing.lg,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 12,
-    gap: spacing.xs,
-  },
-  hintTitle: {
-    ...typography.label,
-    color: colors.primary,
-    marginBottom: spacing.xs,
-  },
-  hintText: {
-    ...typography.bodyS,
-    color: colors.textSecondary,
-    fontFamily: 'monospace',
   },
 });

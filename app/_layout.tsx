@@ -38,16 +38,11 @@ function RootNavigator() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Redirección: solo corre cuando splash terminó Y auth cargó
+  // Solo redirige al arranque: si no hay token → login
   useEffect(() => {
     if (!splashDone || loading) return;
-    const inLogin = segments[0] === 'login';
-    if (!token && !inLogin) {
-      router.replace('/login');
-    } else if (token && inLogin) {
-      router.replace('/(tabs)');
-    }
-  }, [token, loading, splashDone]);
+    if (!token) router.replace('/login');
+  }, [splashDone, loading]);
 
   // 1. Splash durante los primeros 2 segundos
   if (!splashDone) return <SplashScreen />;
