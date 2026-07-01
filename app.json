@@ -35,6 +35,13 @@
           "resizeMode": "contain",
           "backgroundColor": "#FF6B35"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Sazón necesita acceso a tus fotos para cambiar tu foto de perfil.",
+          "cameraPermission": "Sazón necesita acceso a tu cámara para sacar una foto de perfil."
+        }
       ]
     ],
     "experiments": {
