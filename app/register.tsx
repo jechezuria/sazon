@@ -46,10 +46,13 @@ function Requisito({ cumplido, texto }: { cumplido: boolean; texto: string }) {
   );
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
+
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function RegisterScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { setSession } = useAuth();
 
   const [nombre,    setNombre]    = useState('');
   const [apellido,  setApellido]  = useState('');
@@ -68,6 +71,14 @@ export default function RegisterScreen() {
       setError('Completá todos los campos');
       return;
     }
+    if (!EMAIL_REGEX.test(email.trim())) {
+      setError('Ingresá un email válido (ej: sofia@email.com)');
+      return;
+    }
+    if (!USERNAME_REGEX.test(username.trim())) {
+      setError('El usuario debe tener entre 3 y 20 caracteres (letras, números o _)');
+      return;
+    }
     if (!pwdValida) {
       setPwdTocada(true);
       setError('La contraseña no cumple los requisitos');
@@ -78,8 +89,9 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       const fullName = `${nombre.trim()} ${apellido.trim()}`;
-      await register({ name: fullName, username: username.trim(), email: email.trim(), password });
-      await login({ email: email.trim(), password });
+      const authRes = await register({ name: fullName, username: username.trim(), email: email.trim(), password });
+      await setSession(authRes);
+      router.replace('/(tabs)');
     } catch (e: any) {
       setError(e.message ?? 'Error al registrarse');
     } finally {
