@@ -162,7 +162,14 @@ export default function RecipeDetailScreen() {
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.title} numberOfLines={3}>{recipe.title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, styles.titleFlex]} numberOfLines={3}>{recipe.title}</Text>
+          {recipe.difficulty && (
+            <View style={styles.difficultyChip}>
+              <Text style={styles.difficultyText}>{recipe.difficulty}</Text>
+            </View>
+          )}
+        </View>
 
         <View style={styles.authorRow}>
           <SmallAvatar name={recipe.author.name} />
@@ -242,7 +249,11 @@ const styles = StyleSheet.create({
   heroBtnGroup: { flexDirection: 'row', gap: 8 },
   heroBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
   panel: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -24, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  titleFlex: { flex: 1 },
   title: { ...typography.displayL, color: colors.textPrimary },
+  difficultyChip: { backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginTop: 4, flexShrink: 0 },
+  difficultyText: { ...typography.bodyS, color: colors.primary, fontWeight: '700' },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   smallAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   smallAvatarText: { fontSize: 11, fontWeight: '700', color: colors.primary },
