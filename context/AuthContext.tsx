@@ -1,50 +1,74 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthUser } from '../services/auth.service';
+import {
+  AuthUser,
+  getMe,
+  login as loginApi,
+  LoginInput,
+} from "@/services/auth.service";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
-interface AuthContextType {
+const TOKEN_KEY = "@sazon:token";
+
+interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
-  isAuthenticated: boolean;
-  login: (user: AuthUser, token: string) => void;
-  logout: () => void;
+  loading: boolean;
+  login: (input: LoginInput) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (userData: AuthUser, userToken: string) => {
-    setUser(userData);
-    setToken(userToken);
-    // Aquí podrías guardar el token en AsyncStorage en el futuro
-  };
+  // Al iniciar: recupera el token guardado y valida la sesión
+  useEffect(() => {
+    AsyncStorage.getItem(TOKEN_KEY)
+      .then(async (saved) => {
+        if (saved) {
+          try {
+            const me = await getMe(saved);
+            setToken(saved);
+            setUser(me);
+          } catch {
+            await AsyncStorage.removeItem(TOKEN_KEY);
+          }
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
-  const logout = () => {
-    setUser(null);
+  async function login(input: LoginInput) {
+    const res = await loginApi(input);
+    await AsyncStorage.setItem(TOKEN_KEY, res.token);
+    setToken(res.token);
+    setUser(res.user);
+  }
+
+  async function logout() {
+    await AsyncStorage.removeItem(TOKEN_KEY);
     setToken(null);
-  };
+    setUser(null);
+  }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: !!token,
-        login,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth debe usarse dentro de un AuthProvider');
-  }
-  return context;
-};
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth debe usarse dentro de AuthProvider");
+  return ctx;
+}

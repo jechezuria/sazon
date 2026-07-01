@@ -1,100 +1,68 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Image,
-} from 'react-native';
+import React from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
+import { spacing } from '@/theme/spacing';
+import { RecipeCard } from '@/components/molecules/RecipeCard';
+import { useLikes } from '@/hooks/useLikes';
 
-// 1. Datos de ejemplo para las tarjetas
-const SAVED_RECIPES = [
-  {
-    id: '1',
-    title: 'Fluffy Buttermilk Pancakes',
-    category: 'BREAKFAST',
-    author: 'Sofia',
-    time: '20 min',
-    image: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?q=80&w=500',
-  },
-  {
-    id: '2',
-    title: 'Silky Chocolate Mousse',
-    category: 'DESSERTS',
-    author: 'Sofia',
-    time: '40 min',
-    image: 'https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?q=80&w=500',
-  },
-];
+const SCREEN_W = Dimensions.get('window').width;
+const CARD_GAP = spacing.md;
+const CARD_W = (SCREEN_W - spacing.lg * 2 - CARD_GAP) / 2;
 
 export default function FavoritosScreen() {
-  const [activeTab, setActiveTab] = useState('Saved');
+  const router = useRouter();
+  const { likedRecipes, toggleLike, isLiked, loading } = useLikes();
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Título de la pantalla */}
-        <Text style={styles.headerTitle}>Mi Biblioteca</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* 📑 Menú de pestañas superiores */}
-        <View style={styles.tabsRow}>
-          {['Saved'].map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveTab(tab)}
-              style={styles.tabButton}
-            >
-              <Text style={[
-                styles.tabText,
-                activeTab === tab && styles.tabTextActive
-              ]}>
-                {tab === 'Saved' ? 'Guardados' : tab === 'Collections' ? 'Colecciones' : 'Offline'}
-              </Text>
-              {activeTab === tab && <View style={styles.activeIndicator} />}
-            </TouchableOpacity>
-          ))}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Mis Favoritos</Text>
+          <Text style={styles.headerSub}>
+            {likedRecipes.length === 0
+              ? 'Aún no guardaste recetas'
+              : `${likedRecipes.length} ${likedRecipes.length === 1 ? 'receta guardada' : 'recetas guardadas'}`}
+          </Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* 🍱 Grid de Recetas (Muestra las tarjetas) */}
+        {likedRecipes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Feather name="heart" size={56} color={colors.primaryMid} />
+            <Text style={styles.emptyTitle}>Sin favoritos todavía</Text>
+            <Text style={styles.emptyText}>
+              Tocá el corazón en cualquier receta para guardarla acá.
+            </Text>
+          </View>
+        ) : (
           <View style={styles.grid}>
-            {SAVED_RECIPES.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.card} activeOpacity={0.9}>
-                {/* Imagen con etiquetas encima */}
-                <View style={styles.imageContainer}>
-                  <Image source={{ uri: item.image }} style={styles.recipeImage} />
-                  <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryText}>{item.category}</Text>
-                  </View>
-                  <View style={styles.heartIcon}>
-                    <Text style={{ fontSize: 10 }}>🧡</Text>
-                  </View>
-                </View>
-
-                {/* Información de la receta */}
-                <View style={styles.cardInfo}>
-                  <Text style={styles.recipeTitle} numberOfLines={2}>{item.title}</Text>
-
-                  <View style={styles.footerRow}>
-                    <View style={styles.authorRow}>
-                      <View style={styles.avatarPlaceholder} />
-                      <Text style={styles.authorName}>{item.author}</Text>
-                    </View>
-                    <View style={styles.timeRow}>
-                      <Text style={{ fontSize: 10 }}>🕒</Text>
-                      <Text style={styles.timeText}>{item.time}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
+            {likedRecipes.map(recipe => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                variant="compact"
+                width={CARD_W}
+                isLiked={isLiked(recipe.id)}
+                onPress={() => router.push(`/recipe/${recipe.id}`)}
+                onLike={() => toggleLike(recipe.id)}
+              />
             ))}
           </View>
-        </ScrollView>
-      </View>
+        )}
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -104,134 +72,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    flex: 1,
+    paddingBottom: spacing['4xl'],
+  },
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   headerTitle: {
     ...typography.displayL,
     color: colors.textPrimary,
-    marginBottom: 20,
+    marginBottom: spacing.xs,
   },
-  // 📑 Estilos de las pestañas superiores
-  tabsRow: {
-    flexDirection: 'row',
-    gap: 24,
-    marginBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  headerSub: {
+    ...typography.bodyS,
+    color: colors.textSecondary,
   },
-  tabButton: {
-    paddingBottom: 10,
-    position: 'relative',
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: spacing['4xl'],
+    paddingHorizontal: spacing['2xl'],
+    gap: spacing.md,
   },
-  tabText: {
+  emptyTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  emptyText: {
     ...typography.bodyM,
-    color: colors.textMuted,
-    fontWeight: '600',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
-  tabTextActive: {
-    color: colors.primary,
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: colors.primary,
-  },
-  // 🍱 Estilos del Grid y las Tarjetas
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 16,
-    paddingBottom: 40,
-  },
-  card: {
-    width: '47%',
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  imageContainer: {
-    height: 120,
-    position: 'relative',
-  },
-  recipeImage: {
-    width: '100%',
-    height: '100%',
-  },
-  categoryBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  categoryText: {
-    color: 'white',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  heartIcon: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'white',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // 📝 Información de la receta
-  cardInfo: {
-    padding: 12,
-  },
-  recipeTitle: {
-    ...typography.h3,
-    fontSize: 13,
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  avatarPlaceholder: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: colors.primaryMid,
-  },
-  authorName: {
-    fontSize: 10,
-    color: colors.textSecondary,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  timeText: {
-    fontSize: 10,
-    color: colors.textMuted,
+    paddingHorizontal: spacing.lg,
+    gap: CARD_GAP,
   },
 });
