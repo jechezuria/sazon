@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -13,37 +13,72 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { register } from '@/services/auth.service';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 
+// ─── Validación de contraseña ─────────────────────────────────────────────────
+function validatePassword(pwd: string) {
+  return {
+    minLength:     pwd.length >= 8,
+    hasLetter:     /[a-zA-Z]/.test(pwd),
+    hasNumber:     /[0-9]/.test(pwd),
+    alphanumeric:  /^[a-zA-Z0-9]*$/.test(pwd) && pwd.length > 0,
+  };
+}
+
+// ─── Indicador visual de requisito ───────────────────────────────────────────
+function Requisito({ cumplido, texto }: { cumplido: boolean; texto: string }) {
+  return (
+    <View style={styles.requisito}>
+      <Feather
+        name={cumplido ? 'check-circle' : 'circle'}
+        size={14}
+        color={cumplido ? colors.success : colors.textMuted}
+      />
+      <Text style={[styles.requisitoText, cumplido && styles.requisitoCumplido]}>
+        {texto}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function RegisterScreen() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [name, setName]         = useState('');
-  const [username, setUsername] = useState('');
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [nombre,    setNombre]    = useState('');
+  const [apellido,  setApellido]  = useState('');
+  const [username,  setUsername]  = useState('');
+  const [email,     setEmail]     = useState('');
+  const [password,  setPassword]  = useState('');
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+  const [pwdTocada, setPwdTocada] = useState(false);
+
+  const pwdRules = useMemo(() => validatePassword(password), [password]);
+  const pwdValida = Object.values(pwdRules).every(Boolean);
 
   async function handleRegister() {
-    if (!name.trim() || !username.trim() || !email.trim() || !password.trim()) {
+    if (!nombre.trim() || !apellido.trim() || !username.trim() || !email.trim() || !password.trim()) {
       setError('Completá todos los campos');
       return;
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    if (!pwdValida) {
+      setPwdTocada(true);
+      setError('La contraseña no cumple los requisitos');
       return;
     }
+
     setError(null);
     setLoading(true);
     try {
-      await register({ name: name.trim(), username: username.trim(), email: email.trim(), password });
-      // Después de registrar, hacemos login automático para obtener el token
+      const fullName = `${nombre.trim()} ${apellido.trim()}`;
+      await register({ name: fullName, username: username.trim(), email: email.trim(), password });
       await login({ email: email.trim(), password });
     } catch (e: any) {
       setError(e.message ?? 'Error al registrarse');
@@ -60,9 +95,9 @@ export default function RegisterScreen() {
           {/* Logo */}
           <View style={styles.header}>
             <Image
-              source={require('@/assets/images/logo.png')}
+              source={require('@/assets/images/logo-icon.png')}
               style={styles.logo}
-              resizeMode="cover"
+              resizeMode="contain"
             />
             <Text style={styles.appName}>Sazón</Text>
             <Text style={styles.subtitle}>¡Registrate para encontrar tus recetas favoritas!</Text>
@@ -70,17 +105,33 @@ export default function RegisterScreen() {
 
           {/* Formulario */}
           <View style={styles.form}>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Nombre completo</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: Sofia Chen"
-                placeholderTextColor={colors.textMuted}
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
+
+            {/* Nombre y Apellido en fila */}
+            <View style={styles.row}>
+              <View style={[styles.fieldGroup, styles.rowField]}>
+                <Text style={styles.label}>Nombre</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Sofia"
+                  placeholderTextColor={colors.textMuted}
+                  value={nombre}
+                  onChangeText={setNombre}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
+              <View style={[styles.fieldGroup, styles.rowField]}>
+                <Text style={styles.label}>Apellido</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Chen"
+                  placeholderTextColor={colors.textMuted}
+                  value={apellido}
+                  onChangeText={setApellido}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
             </View>
 
             <View style={styles.fieldGroup}>
@@ -112,24 +163,38 @@ export default function RegisterScreen() {
               />
             </View>
 
+            {/* Contraseña con requisitos en tiempo real */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Contraseña</Text>
               <TextInput
-                style={styles.input}
-                placeholder="Mínimo 6 caracteres"
+                style={[
+                  styles.input,
+                  pwdTocada && !pwdValida && styles.inputError,
+                ]}
+                placeholder="Mínimo 8 caracteres alfanuméricos"
                 placeholderTextColor={colors.textMuted}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={v => { setPassword(v); setPwdTocada(true); }}
                 secureTextEntry
                 returnKeyType="done"
                 onSubmitEditing={handleRegister}
               />
+
+              {/* Requisitos — se muestran al empezar a escribir */}
+              {pwdTocada && (
+                <View style={styles.requisitos}>
+                  <Requisito cumplido={pwdRules.minLength}    texto="Mínimo 8 caracteres" />
+                  <Requisito cumplido={pwdRules.hasLetter}    texto="Al menos 1 letra" />
+                  <Requisito cumplido={pwdRules.hasNumber}    texto="Al menos 1 número" />
+                  <Requisito cumplido={pwdRules.alphanumeric} texto="Solo letras y números (sin símbolos)" />
+                </View>
+              )}
             </View>
 
             {error && <Text style={styles.errorText}>{error}</Text>}
 
             <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, (loading || !pwdValida && pwdTocada) && styles.buttonDisabled]}
               onPress={handleRegister}
               disabled={loading}
             >
@@ -154,6 +219,7 @@ export default function RegisterScreen() {
   );
 }
 
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -191,6 +257,13 @@ const styles = StyleSheet.create({
   form: {
     gap: spacing.lg,
   },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  rowField: {
+    flex: 1,
+  },
   fieldGroup: {
     gap: spacing.sm,
   },
@@ -207,6 +280,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     ...typography.bodyM,
     color: colors.textPrimary,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  requisitos: {
+    gap: spacing.xs,
+    paddingTop: spacing.xs,
+  },
+  requisito: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  requisitoText: {
+    ...typography.bodyS,
+    color: colors.textMuted,
+  },
+  requisitoCumplido: {
+    color: colors.success,
   },
   errorText: {
     ...typography.bodyS,
