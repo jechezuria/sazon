@@ -47,6 +47,7 @@ function RootNavigator() {
         <Stack.Screen name="crear/ingredientes"     options={{ headerShown: false }} />
         <Stack.Screen name="crear/pasos"            options={{ headerShown: false }} />
         <Stack.Screen name="perfil/editar"          options={{ headerShown: false }} />
+        <Stack.Screen name="perfil/publicaciones"   options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="dark" backgroundColor="transparent" translucent />
     </LikesProvider>
