@@ -76,14 +76,9 @@ export default function EditarPerfilScreen() {
   // ── Lógica foto ─────────────────────────────────────────────────────────────
   async function handlePickPhoto() {
     Alert.alert('Foto de perfil', 'Elegí una opción', [
-      {
-        text: 'Sacar foto',
-        onPress: launchCamera,
-      },
-      {
-        text: 'Elegir de galería',
-        onPress: launchGallery,
-      },
+      { text: 'Sacar foto',        onPress: launchCamera  },
+      { text: 'Elegir de galería', onPress: launchGallery },
+      ...(avatarUri ? [{ text: 'Eliminar foto', style: 'destructive' as const, onPress: () => setAvatarUri(null) }] : []),
       { text: 'Cancelar', style: 'cancel' },
     ]);
   }
