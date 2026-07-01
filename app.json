@@ -30,13 +30,17 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/logo.png",
+          "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#FF6B35"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Sazón necesita acceso a tus fotos para cambiar tu foto de perfil.",
+          "cameraPermission": "Sazón necesita acceso a tu cámara para sacar una foto de perfil."
         }
       ]
     ],

@@ -1,0 +1,671 @@
+# Sazón — Registro de aprendizaje
+
+Este archivo documenta qué hace cada parte del código que vamos construyendo, con explicaciones para estudiar y practicar.
+
+---
+
+## `app/(tabs)/buscar.tsx` — Primera conexión real al backend
+
+Esta pantalla es la primera en dejar de usar el mock data: la búsqueda ahora le pega al backend real (`GET /api/recipes?search=...`) en lugar de filtrar el array `MOCK_RECIPES` en memoria. El resto de la pantalla (recientes, ingredientes, likes) sigue igual que antes.
+
+### El problema de pegarle a una API en cada tecla
+
+Con el mock, `search(query)` era una función síncrona — corría instantáneo en el dispositivo. Ahora es una llamada de red, que tarda y tiene costo. Si dispararas una request por cada letra que escribe el usuario ("p", "po", "pol", "poll"...), mandarías 4 requests para escribir una palabra de 4 letras, casi todas inútiles porque el usuario sigue escribiendo.
+
+**La solución es debounce**: esperar un poco después de la última tecla antes de buscar.
+
+```tsx
+useEffect(() => {
+  const trimmed = query.trim();
+  if (trimmed.length === 0) { /* limpiar todo */ return; }
+
+  let cancelled = false;
+  setLoading(true);
+
+  const timeoutId = setTimeout(async () => {
+    try {
+      const data = await getRecipes({ search: trimmed });
+      if (!cancelled) setResultados(data);
+    } catch {
+      if (!cancelled) setError(true);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  }, 400);
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timeoutId);
+  };
+}, [query]);
+```
+
+> Cada vez que `query` cambia, React primero ejecuta la función de **cleanup** (el `return () => {...}`) del efecto anterior, y *después* corre el nuevo efecto. Como el cleanup hace `clearTimeout`, si el usuario escribe una letra nueva antes de que pasen los 400ms, el timeout viejo se cancela y arranca uno nuevo. Solo se dispara la request real cuando el usuario deja de tipear por 400ms.
+
+### El problema de las respuestas que llegan en el orden equivocado
+
+Incluso con debounce, dos requests pueden estar "en vuelo" al mismo tiempo (por ejemplo, si la red está lenta). Si la respuesta de una búsqueda vieja ("po") llega *después* de la respuesta de la búsqueda nueva ("pollo"), pisaría los resultados correctos con resultados viejos.
+
+```tsx
+let cancelled = false;
+...
+const timeoutId = setTimeout(async () => {
+  const data = await getRecipes({ search: trimmed });
+  if (!cancelled) setResultados(data);   // ← el chequeo clave
+  ...
+}, 400);
+
+return () => { cancelled = true; ... };
+```
+> `cancelled` es una variable capturada por el closure de ese efecto específico. Cuando el efecto se "limpia" (porque `query` volvió a cambiar), `cancelled` pasa a `true` *para esa instancia del efecto* — pero la respuesta de la request vieja, cuando finalmente llegue, va a revisar su propia copia de `cancelled` (que ahora es `true`) y va a decidir no actualizar el estado. Es un patrón estándar para evitar "race conditions" en componentes de React con datos async.
+
+### Tres estados de la UI en lugar de uno
+
+Con datos síncronos del mock solo había dos casos: "hay resultados" o "no hay resultados". Con una API real hay que sumar un tercero: **mientras se espera la respuesta** y **si la red falla**.
+
+```tsx
+loading ? (
+  <ActivityIndicator color={colors.primary} size="large" />
+) : error ? (
+  <Text>No pudimos conectar</Text>
+) : resultados.length > 0 ? (
+  <View style={styles.grid}>...</View>
+) : (
+  <Text>Sin resultados</Text>
+)
+```
+> Es importante no confundir "todavía no llegó la respuesta" con "la respuesta llegó y vino vacía" — son situaciones distintas para el usuario y necesitan mensajes distintos.
+
+---
+
+## `services/` — Capa de conexión al backend
+
+Esta carpeta es nueva y **todavía no se usa** en ninguna pantalla — las pantallas siguen usando `useRecipes`/`useLikes` con el mock data como hasta ahora. Es la capa lista para cuando decidamos reemplazar los datos mockeados por datos reales del backend (`backend-sazon`).
+
+### `services/config.ts` — la URL en un solo lugar
+
+```ts
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+```
+> Expo solo expone al código del cliente las variables de entorno que empiezan con `EXPO_PUBLIC_` — es una medida de seguridad para que no termines mandando un secreto del backend (como una API key) al bundle de la app por accidente.
+> El `??` es el operador de coalescencia nula: si la variable de entorno no está definida, usa `'http://localhost:4000'` como respaldo. Cuando el backend esté en Render, alcanza con cambiar el `.env` (o el valor por defecto) — ningún archivo de servicio necesita tocarse.
+
+### `services/apiClient.ts` — un solo wrapper sobre `fetch`
+
+```ts
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  ...
+}
+```
+> En lugar de llamar a `fetch` directamente desde cada servicio (y repetir el manejo de headers, JSON y errores 8 veces), todos los servicios pasan por esta única función. Si mañana hay que agregar, por ejemplo, un timeout global o loguear todas las requests, se cambia en un solo lugar.
+
+```ts
+export class ApiError extends Error {
+  status: number;
+  ...
+}
+```
+> Extender `Error` permite crear un tipo de error específico de la app. Así, quien use el servicio puede hacer `catch (err) { if (err instanceof ApiError && err.status === 401) ... }` y reaccionar distinto según el código HTTP, en lugar de parsear el mensaje de texto.
+
+```ts
+if (response.status === 204) {
+  return undefined as T;
+}
+```
+> El status `204 No Content` (lo devuelve por ejemplo un DELETE) no tiene body. Si se intentara hacer `response.json()` sobre una respuesta vacía, fallaría — por eso se corta antes.
+
+### `services/recipes.service.ts` — filtros como query params
+
+```ts
+function buildQuery(filters: RecipeFilters): string {
+  const params = new URLSearchParams();
+  if (filters.category) params.set('category', filters.category);
+  ...
+  return query ? `?${query}` : '';
+}
+```
+> `URLSearchParams` arma el string de query (`?category=Postre&search=avena`) escapando caracteres especiales automáticamente (espacios, tildes, etc.) — más seguro que concatenar strings a mano.
+> Los filtros son todos opcionales (`category?`, `difficulty?`) — si no se pasa ninguno, `getRecipes()` sin argumentos trae todas las recetas, igual que `useRecipes().getAll()` hace hoy con el mock.
+
+### Por qué el token se pasa como parámetro y no se guarda solo
+
+```ts
+export function getMyLikedRecipes(token: string): Promise<Recipe[]> {
+  return apiRequest<Recipe[]>('/api/recipes/liked/mine', { token });
+}
+```
+> Estos servicios son funciones puras: no saben de dónde viene el token ni dónde se guarda (`AsyncStorage`, `SecureStore`, un Context de React, etc.). Esa decisión se toma en otra capa, todavía no construida, que maneje la sesión del usuario. Mantener los servicios "tontos" (solo saben hablar HTTP) hace que sean fáciles de testear y de reutilizar sin importar cómo se resuelva el login más adelante.
+
+---
+
+## Estructura general del proyecto
+
+```
+sazon/
+├── app/              → Pantallas (Expo Router las convierte en rutas automáticamente)
+├── components/       → Piezas de UI reutilizables (atoms, molecules, organisms)
+├── theme/            → Tokens de diseño: colores, tipografía, espaciado, sombras
+├── types/            → Tipos TypeScript compartidos por toda la app
+├── data/             → Datos de prueba (mock data)
+└── hooks/            → Lógica reutilizable (likes, búsqueda)
+```
+
+**¿Por qué esta estructura?**
+Separar UI, lógica y datos hace que cada archivo tenga una sola responsabilidad. Si mañana cambia el color primario, solo tocás `theme/colors.ts`. Si cambia la fuente de datos, solo tocás `data/mockData.ts`.
+
+---
+
+## `theme/` — Tokens de diseño
+
+### `theme/colors.ts`
+Define todos los colores de la app como constantes con nombre.
+
+```ts
+export const colors = {
+  primary: '#FF6B35',       // Naranja principal — botones, íconos activos
+  primaryLight: '#FFF0EA',  // Versión pálida — fondos de chips, badges
+  bg: '#FAFAF7',            // Fondo global (crema muy suave, no blanco puro)
+  surface: '#FFFFFF',       // Cards, modales, inputs — blanco puro
+  border: '#F0EDE8',        // Bordes y separadores — casi invisible
+  textPrimary: '#1A1A1A',   // Títulos y texto importante — casi negro
+  textSecondary: '#6B6B6B', // Subtítulos y metadatos — gris medio
+  textMuted: '#B0ADA8',     // Placeholders y labels inactivos — gris claro
+  ...
+}
+```
+
+**Regla de uso:** Nunca escribir un color hardcodeado como `'#FF6B35'` en un componente. Siempre usar `colors.primary`. Así si el día de mañana querés cambiar el naranja, lo cambiás en un solo lugar.
+
+### `theme/typography.ts`
+Define estilos de texto predefinidos (tamaño, peso, altura de línea).
+
+```ts
+displayXL: { fontSize: 28, fontWeight: '800', lineHeight: 34 }  // Títulos grandes de pantalla
+displayL:  { fontSize: 22, fontWeight: '700', lineHeight: 28 }  // Títulos medianos
+bodyS:     { fontSize: 13, fontWeight: '400', lineHeight: 18 }  // Texto pequeño
+```
+
+**¿Por qué `fontWeight` como string?** React Native requiere que `fontWeight` sea un string (`'700'`), no un número (`700`).
+
+### `theme/spacing.ts`
+Define una escala de espaciado y radios de borde.
+
+```ts
+export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 }
+export const radius  = { sm: 8, md: 12, lg: 16, xl: 20, full: 9999 }
+```
+
+**`radius.full: 9999`** — Un número muy grande garantiza que cualquier elemento quede perfectamente redondo sin importar su tamaño. Es el truco estándar para hacer pills y círculos.
+
+---
+
+## `app/(tabs)/index.tsx` — Pantalla de Inicio
+
+### Paso 1: Header
+
+```tsx
+// Línea 3
+import { SafeAreaView } from 'react-native-safe-area-context';
+```
+> **¿Por qué no el `SafeAreaView` de `react-native`?**
+> El de `react-native` a veces no respeta bien el notch o la Dynamic Island en iOS. El de `react-native-safe-area-context` es más confiable porque lee el tamaño real del área segura del dispositivo.
+
+```tsx
+// Línea 10–16
+const FRASES = [
+  '¿En qué te inspirás hoy?',
+  '¿Qué cocinamos hoy?',
+  ...
+];
+```
+> Array definido **fuera del componente** para que no se recree en cada render. Si lo ponés adentro de `HomeScreen()`, React lo crearía de cero cada vez que la pantalla se actualice.
+
+```tsx
+// Línea 20
+const frase = useMemo(() => FRASES[Math.floor(Math.random() * FRASES.length)], []);
+```
+> `useMemo` guarda el resultado de una función y no lo recalcula a menos que cambien sus dependencias (el `[]` significa "nunca recalcular"). Sin `useMemo`, la frase cambiaría en cada re-render.
+> `Math.random() * FRASES.length` genera un número entre 0 y 4.999..., `Math.floor` lo redondea hacia abajo → índice aleatorio entre 0 y 4.
+
+```tsx
+// Línea 23
+<SafeAreaView style={styles.safe}>
+```
+> Envuelve toda la pantalla. Agrega automáticamente el padding necesario para que el contenido no quede debajo del notch, la barra de estado o la barra de gestos.
+
+```tsx
+// Línea 24
+<ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+```
+> Aunque ahora solo hay un header, ya ponemos `ScrollView` para que cuando agreguemos secciones (categorías, cards, etc.) la pantalla sea scrolleable.
+> `showsVerticalScrollIndicator={false}` oculta la barra de scroll gris de la derecha.
+
+```tsx
+// Línea 26–39 — Layout del header
+<View style={styles.header}>         // Fila: texto izquierda + botón derecha
+  <View>
+    <Text style={styles.greeting}>¡Hola!</Text>   // Texto pequeño gris arriba
+    <Text style={styles.headline}>{frase}</Text>   // Frase grande negra abajo
+  </View>
+  <Pressable ...>                    // Botón ♡ que navega a /likes
+    <Feather name="heart" ... />
+  </Pressable>
+</View>
+```
+
+```tsx
+// Estilos del header
+header: {
+  flexDirection: 'row',          // Pone texto y botón en la misma fila
+  justifyContent: 'space-between', // Texto a la izquierda, botón a la derecha
+  alignItems: 'flex-start',      // Los alinea por la parte de arriba (no centrado vertical)
+}
+```
+
+```tsx
+greeting: {
+  ...typography.bodyS,           // Texto chico (13px)
+  color: colors.textSecondary,   // Gris — no compite con el headline
+}
+headline: {
+  ...typography.displayL,        // Texto grande (22px, bold)
+  color: colors.textPrimary,     // Casi negro
+  maxWidth: 260,                 // Evita que el texto se extienda hasta el botón
+}
+```
+
+```tsx
+likeBtn: {
+  width: 44, height: 44,         // 44pt es el tamaño mínimo recomendado por Apple para touch targets
+  borderRadius: 22,              // La mitad del ancho/alto → círculo perfecto
+  backgroundColor: colors.primary, // Naranja sólido
+}
+```
+
+---
+
+### Paso 2: Barra de búsqueda
+
+```tsx
+// Línea 42–50
+<Pressable
+  onPress={() => router.push('/buscar')}
+  style={styles.searchBar}
+>
+  <Feather name="search" size={18} color={colors.textMuted} />
+  <Text style={styles.searchPlaceholder}>Buscá recetas, ingredientes...</Text>
+</Pressable>
+```
+
+> **¿Por qué `Pressable` y no `TextInput`?**
+> La barra en el Home es **decorativa** — no escribe, no busca. Al tocarla, lleva al usuario a la pantalla de búsqueda `/buscar` donde sí hay un input real. Esto es un patrón común en apps (Instagram, Airbnb) porque permite animar la transición y tener el input siempre enfocado al llegar.
+
+```tsx
+searchBar: {
+  flexDirection: 'row',       // Ícono y texto en fila
+  alignItems: 'center',       // Centrados verticalmente
+  gap: spacing.sm,            // Espacio entre ícono y texto (8pt)
+  height: 48,                 // Altura estándar para inputs (del design system)
+  backgroundColor: colors.surface,  // Blanco
+  borderRadius: 12,           // Bordes redondeados suaves
+  borderWidth: 1.5,           // Borde sutil
+  borderColor: colors.border, // Color borde casi invisible
+}
+```
+
+---
+
+### Paso 3: Categorías
+
+```tsx
+const CATEGORIAS = ['Todas', 'Desayuno', 'Almuerzo', 'Merienda', 'Cena', 'Postres'];
+```
+> Array de strings simples fuera del componente. No necesitamos objetos con emoji ni id porque el label mismo es suficiente como clave y como valor de estado.
+
+```tsx
+const [categoriaActiva, setCategoriaActiva] = useState('Todas');
+```
+> `useState` guarda qué categoría está seleccionada. El valor inicial es `'Todas'`. Cada vez que el usuario toca una pill, llamamos a `setCategoriaActiva(cat)` y React re-renderiza solo las pills afectadas.
+
+```tsx
+<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsRow}>
+  {CATEGORIAS.map(cat => (
+    <CategoryPill
+      key={cat}
+      label={cat}
+      active={categoriaActiva === cat}   // true solo para la pill seleccionada
+      onPress={() => setCategoriaActiva(cat)}
+    />
+  ))}
+</ScrollView>
+```
+> **`ScrollView` horizontal** — permite scrollear hacia los costados cuando las pills no entran en pantalla. La prop `horizontal` es la que cambia el eje.
+> **`.map()`** — itera el array y devuelve un componente por cada elemento. La prop `key` es obligatoria en listas: React la usa internamente para saber qué elementos cambiaroon sin tener que re-renderizar toda la lista.
+
+---
+
+### Paso 5: Grilla de recetas
+
+```tsx
+// Cálculo del ancho de cada card
+const SCREEN_W = Dimensions.get('window').width;
+const CARD_GAP = spacing.md;  // 12pt entre columnas
+const CARD_W = (SCREEN_W - spacing.lg * 2 - CARD_GAP) / 2;
+```
+> Se calcula una sola vez al cargar el módulo (fuera del componente).
+> Fórmula: ancho disponible = pantalla − padding izquierdo − padding derecho − gap entre columnas, dividido en 2.
+> Pasarlo explícitamente a cada card evita que cada una tenga que calcularlo por su cuenta.
+
+```tsx
+const CATEGORIA_MAP: Record<string, Category | null> = {
+  'Todas':    null,
+  'Desayuno': 'Desayuno',
+  'Merienda': 'Snack',    // ← el label del UI no coincide con el tipo
+  'Postres':  'Postre',   // ← igual acá
+  ...
+};
+```
+> Los labels del UI (`'Merienda'`, `'Postres'`) no coinciden exactamente con los valores del tipo `Category` del modelo de datos (`'Snack'`, `'Postre'`). El mapa hace la conversión en un solo lugar. `null` para "Todas" significa "sin filtro".
+
+```tsx
+const recetas = useMemo(() => {
+  const catFiltro = CATEGORIA_MAP[categoriaActiva];
+  const resultado = catFiltro ? getByCategory(catFiltro) : getAll();
+  return resultado.slice(0, 8);
+}, [categoriaActiva]);
+```
+> `useMemo` recalcula las recetas **solo cuando cambia `categoriaActiva`**, no en cada render.
+> `getByCategory` filtra el array de mock data. `getAll` devuelve todo.
+> `.slice(0, 8)` toma solo los primeros 8 resultados.
+
+```tsx
+<View style={styles.grid}>
+  {recetas.map(recipe => (
+    <RecipeCard key={recipe.id} recipe={recipe} variant="compact" width={CARD_W} ... />
+  ))}
+</View>
+```
+> El grid usa `flexDirection: 'row'` + `flexWrap: 'wrap'`. Con `wrap`, cuando los items no caben en una fila se pasan a la siguiente automáticamente — así se forma la grilla de 2 columnas sin necesidad de `FlatList` ni lógica extra.
+
+```tsx
+grid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  paddingHorizontal: spacing.lg,
+  gap: CARD_GAP,
+}
+```
+> **`gap`** en React Native (disponible desde RN 0.71) funciona igual que en CSS: aplica espacio entre todos los hijos tanto horizontal como verticalmente, sin tener que agregar `marginRight` o `marginBottom` a cada card.
+
+---
+
+### `data/mockData.ts` — Por qué existe y cómo funciona
+
+```ts
+export const MOCK_RECIPES: Recipe[] = [ ... ]
+```
+> Un array de objetos que simulan lo que vendría de una base de datos o API. Usar el tipo `Recipe[]` hace que TypeScript verifique que cada objeto tenga todos los campos obligatorios con el tipo correcto — si te olvidás de un campo, el error aparece en el editor antes de correr la app.
+
+**¿Por qué `export`?** Para poder importarlo desde cualquier otro archivo. El `export` en los datos y el `import` en los hooks mantiene una dirección clara: `pantalla → hook → datos`.
+
+---
+
+### `components/molecules/RecipeCard.tsx` — Ícono de corazón
+
+```tsx
+// ❌ Feather solo tiene corazón outline, no relleno
+<Feather name="heart" />
+
+// ✅ Ionicons tiene ambas variantes
+import { Ionicons } from '@expo/vector-icons';
+<Ionicons name={isLiked ? 'heart' : 'heart-outline'} color={colors.error} />
+```
+> `@expo/vector-icons` agrupa varios sets de íconos (Feather, Ionicons, AntDesign, MaterialIcons, etc.). Cada set tiene su propia colección — si un set no tiene el ícono que necesitás, podés cambiar de set sin instalar nada nuevo.
+
+```tsx
+// Botón circular blanco sobre la imagen
+compactLike: {
+  position: 'absolute',   // Sale del flujo normal, se posiciona sobre la imagen
+  top: spacing.sm,
+  right: spacing.sm,
+  width: 32, height: 32,
+  borderRadius: 16,       // Mitad del tamaño → círculo
+  backgroundColor: colors.surface,  // Blanco para que contraste sobre la foto
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+```
+> `position: 'absolute'` saca al elemento del flujo del layout. Se posiciona relativo al ancestro más cercano que tenga `position: 'relative'` (o cualquier posición). Acá el ancestro es la card que tiene `overflow: 'hidden'`, lo que recorta el botón si se sale de los bordes.
+
+---
+
+## `app/(tabs)/buscar.tsx` — Pantalla de Búsqueda
+
+### Paso 1: Header + barra de búsqueda
+
+**¿Por qué esta pantalla es diferente al buscador del Home?**
+En el Home la barra es un `Pressable` decorativo — al tocarla te lleva a esta pantalla. Acá es un `TextInput` real donde el usuario escribe, React guarda el texto y lo usa para filtrar recetas.
+
+```tsx
+const [query, setQuery] = useState('');
+const [focused, setFocused] = useState(false);
+const inputRef = useRef<TextInput>(null);
+```
+> Dos estados independientes:
+> - `query` — el texto que escribe el usuario
+> - `focused` — si el input está activo o no (para cambiar el estilo del borde)
+>
+> `useRef` guarda una referencia directa al componente `TextInput`. No es un valor de estado — no provoca re-renders. Sirve para llamar métodos del input desde afuera, como `.focus()`.
+
+```tsx
+<Pressable onPress={() => inputRef.current?.focus()} style={[styles.searchBar, focused && styles.searchBarFocused]}>
+```
+> El `Pressable` externo hace que tocar en cualquier parte de la barra (no solo el input) enfoque el cursor. Sin esto, el usuario tendría que tocar exactamente el texto para activar el teclado.
+> `inputRef.current?.focus()` — el `?.` es optional chaining: si `current` es null (el componente no montó todavía), no falla.
+
+```tsx
+// Estilo dinámico según el estado focused
+style={[styles.searchBar, focused && styles.searchBarFocused]}
+```
+> React Native acepta arrays de estilos. El último estilo del array gana en caso de conflicto. `focused && styles.searchBarFocused` devuelve el objeto de estilo si `focused` es true, o `false` si no — React Native ignora los valores falsy en el array de estilos.
+
+```tsx
+searchBar: {
+  borderColor: colors.border,     // Gris por defecto
+},
+searchBarFocused: {
+  borderColor: colors.primary,    // Naranja cuando está activo
+  backgroundColor: colors.surface, // Fondo blanco (era crema)
+},
+```
+> El cambio de borde naranja al enfocar le da feedback visual al usuario: "estás escribiendo acá". Es un patrón estándar de UX para inputs.
+
+```tsx
+{query.length > 0 && (
+  <Pressable onPress={() => setQuery('')} accessibilityLabel="Limpiar búsqueda">
+    <Feather name="x" size={16} color={colors.textMuted} />
+  </Pressable>
+)}
+```
+> El botón de limpiar (`x`) solo aparece cuando hay texto escrito. `query.length > 0` evalúa a `true` si hay al menos un caracter — el cortocircuito `&&` renderiza el componente solo si la condición es verdadera.
+
+```tsx
+<TextInput
+  returnKeyType="search"   // Muestra "Buscar" en el teclado en lugar de "Intro"
+  autoCorrect={false}      // Evita que corrija ingredientes o nombres propios
+/>
+```
+
+```tsx
+// Header con bordes redondeados abajo
+header: {
+  backgroundColor: colors.surface,
+  borderBottomLeftRadius: radius.xl,   // Solo los bordes inferiores
+  borderBottomRightRadius: radius.xl,
+  shadowColor: '#000',
+  shadowOpacity: 0.05,                 // Sombra muy sutil — solo para separarlo del fondo
+  elevation: 3,
+}
+```
+> Redondear solo los bordes inferiores crea el efecto de "card que sale de arriba". Los bordes superiores quedan rectos contra el borde de la pantalla.
+
+---
+
+### Paso 2: Pills de filtro
+
+```tsx
+const FILTROS = ['Todo', 'Rápido', 'Vegetariano', 'Popular', 'Nuevo'];
+const [filtroActivo, setFiltroActivo] = useState('Todo');
+```
+> Mismo patrón que las categorías del Home — array de strings + estado local. Se reutiliza exactamente el mismo componente `CategoryPill` sin modificarlo.
+
+**¿Por qué las pills van dentro del `header` y no en el `ScrollView`?**
+Porque en el diseño el fondo blanco abarca título + buscador + pills. Si las pills estuvieran en el scroll, quedarían sobre el fondo crema (`colors.bg`). Al ponerlas dentro del mismo `View` del header, heredan su `backgroundColor: colors.surface`.
+
+```tsx
+pillsScroll: {
+  marginHorizontal: -spacing.lg,  // -16pt
+  marginTop: spacing.lg,
+},
+pillsRow: {
+  paddingHorizontal: spacing.lg,  // +16pt
+},
+```
+> El header tiene `paddingHorizontal: 16`. Sin el margen negativo, las pills arrancan con 16pt de espacio a la izquierda y la primera pill quedaría desplazada. El `-16` cancela ese padding y el `paddingHorizontal` del `contentContainerStyle` lo repone — el resultado es que las pills arrancan desde el mismo borde que el título y la barra.
+
+---
+
+### Paso 3: Búsquedas recientes
+
+```tsx
+const RECIENTES = ['Pasta carbonara', 'Panqueques de avena', 'Ensalada césar'];
+```
+> Por ahora son datos fijos (mock). En una app real esto vendría de `AsyncStorage` o similar — se guardaría cada vez que el usuario ejecuta una búsqueda.
+
+```tsx
+<Pressable onPress={() => setQuery(term)} ...>
+```
+> Al tocar un resultado reciente, se copia el texto al estado `query`. Esto simula que el usuario escribió ese texto — en el Paso 5 (resultados) ese `query` va a filtrar las recetas automáticamente.
+
+```tsx
+// Separador solo entre ítems, no después del último
+style={[styles.recentItem, index < RECIENTES.length - 1 && styles.recentItemBorder]}
+```
+> `index < RECIENTES.length - 1` es `true` para todos los ítems excepto el último. Así el borde separador aparece entre ítems pero no debajo del último, evitando una línea flotante al final de la card.
+
+```tsx
+recentList: {
+  backgroundColor: colors.surface,
+  borderRadius: radius.lg,
+  overflow: 'hidden',   // ← importante
+},
+```
+> `overflow: 'hidden'` hace que los bordes redondeados de la card recorten los ítems internos. Sin esto, el primer y último ítem no respetarían el `borderRadius` del contenedor y los bordes de la card se verían cuadrados en las esquinas.
+
+---
+
+### Paso 4: Buscar por ingrediente
+
+```tsx
+const INGREDIENTES = ['Palta', 'Pollo', 'Limón', 'Ajo', 'Tomate', 'Huevo', 'Arroz', 'Queso'];
+```
+> Sin emojis — la decisión de diseño es que las pills de texto solas se ven más prolijas y profesionales. El componente `CategoryPill` tiene `emoji` como prop opcional, así que simplemente no se pasa.
+
+```tsx
+<CategoryPill
+  active={query === ing}
+  onPress={() => setQuery(ing)}
+/>
+```
+> Mismo componente que las categorías del Home y los filtros de esta pantalla, usado por tercera vez sin modificarlo. `active` se activa cuando el texto del input coincide exactamente con el ingrediente — si el usuario escribe "Pollo" a mano o toca la pill, la pill queda resaltada.
+> `onPress` hace lo mismo que las búsquedas recientes: copia el label al estado `query`.
+
+**`flexWrap` vs `ScrollView horizontal`**
+
+```tsx
+// Scroll horizontal — los items van en una sola fila infinita
+<ScrollView horizontal>
+  <CategoryPill /> <CategoryPill /> ...
+</ScrollView>
+
+// Wrap — los items se acomodan en filas según el espacio disponible
+<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+  <CategoryPill /> <CategoryPill /> ...
+</View>
+```
+> Con `ScrollView horizontal` el usuario tiene que scrollear para ver todos los ingredientes. Con `flexWrap` todos son visibles de una sola vez, distribuidos en filas. Para una lista corta de ingredientes predefinidos, `flexWrap` es mejor UX porque no requiere descubrimiento.
+
+---
+
+### Paso 5: Resultados de búsqueda
+
+```tsx
+const resultados = useMemo(() => {
+  if (query.trim().length === 0) return [];
+  return search(query.trim());
+}, [query]);
+```
+> `query.trim()` elimina espacios al inicio y al final — evita que un espacio accidental dispare una búsqueda vacía.
+> Si no hay texto, devuelve array vacío sin ni siquiera llamar a `search()`. `useMemo` recalcula solo cuando `query` cambia.
+
+```tsx
+{query.trim().length > 0 ? (
+  resultados.length > 0 ? (
+    /* grilla de resultados */
+  ) : (
+    /* estado vacío */
+  )
+) : (
+  /* recientes + ingredientes */
+)}
+```
+> Tres estados posibles manejados con ternarios anidados:
+> 1. Sin texto → pantalla de descubrimiento (recientes + ingredientes)
+> 2. Con texto + resultados → grilla de cards
+> 3. Con texto + sin resultados → estado vacío con mensaje
+>
+> Los ternarios anidados pueden ser difíciles de leer. Una alternativa más clara sería extraer cada estado a una función o componente separado, pero para tres estados simples está bien así.
+
+```tsx
+<Text style={styles.sectionLabel}>
+  {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
+</Text>
+```
+> Pluralización manual: si hay 1 resultado dice "1 resultado", si hay más dice "2 resultados". El ternario `!== 1 ? 's' : ''` agrega la "s" solo cuando corresponde.
+
+**Estado vacío (empty state)**
+```tsx
+<View style={styles.emptyState}>
+  <Feather name="search" size={40} color={colors.textMuted} />
+  <Text style={styles.emptyTitle}>Sin resultados</Text>
+  <Text style={styles.emptySubtitle}>No encontramos recetas para "{query}"</Text>
+</View>
+```
+> El empty state es importante en UX — sin él el usuario ve una pantalla en blanco y no sabe si algo falló o simplemente no hay resultados. Mostrar el término buscado entre comillas confirma que la app sí procesó la búsqueda.
+
+---
+
+## Conceptos clave de React Native
+
+### Flexbox en React Native
+React Native usa Flexbox para el layout, igual que CSS, pero con diferencias:
+- **Por defecto `flexDirection: 'column'`** (en CSS es `row`) — los elementos se apilan verticalmente
+- Para poner cosas en fila hay que poner `flexDirection: 'row'` explícitamente
+- `justifyContent` controla el eje principal, `alignItems` el eje secundario
+
+### `Pressable` vs `TouchableOpacity` vs `Button`
+- `Button` — muy básico, difícil de estilizar
+- `TouchableOpacity` — el clásico, reduce la opacidad al presionar
+- `Pressable` — el moderno (React Native 0.64+), más flexible, permite estilos distintos según el estado (`pressed`, `focused`, `hovered`)
+
+### `StyleSheet.create()`
+```ts
+const styles = StyleSheet.create({ ... })
+```
+No es obligatorio (podés pasar objetos inline), pero tiene ventajas:
+1. Valida los estilos en tiempo de desarrollo y muestra errores
+2. En producción optimiza los estilos con IDs en lugar de objetos
+
+---
+
+*Este archivo se actualiza con cada paso de la implementación.*
