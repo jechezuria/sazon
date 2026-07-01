@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,12 +12,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 
 export default function LoginScreen() {
+  const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,11 +53,13 @@ export default function LoginScreen() {
 
           {/* Logo / título */}
           <View style={styles.header}>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoEmoji}>🍳</Text>
-            </View>
+            <Image
+              source={require('@/assets/images/logo-icon.png')}
+              style={styles.logo}
+              resizeMode="cover"
+            />
             <Text style={styles.appName}>Sazón</Text>
-            <Text style={styles.subtitle}>Iniciá sesión para ver tus favoritos</Text>
+            <Text style={styles.subtitle}>¡Encontrá tus recetas favoritas!</Text>
           </View>
 
           {/* Formulario */}
@@ -102,6 +107,14 @@ export default function LoginScreen() {
             </Pressable>
           </View>
 
+          {/* Link a registro */}
+          <View style={styles.registerRow}>
+            <Text style={styles.registerText}>¿No tenés cuenta?</Text>
+            <Pressable onPress={() => router.push('/register')}>
+              <Text style={styles.registerLink}> Registrate</Text>
+            </Pressable>
+          </View>
+
           {/* Hint de usuarios de prueba */}
           <View style={styles.hint}>
             <Text style={styles.hintTitle}>Usuarios de prueba:</Text>
@@ -133,17 +146,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing['4xl'],
   },
-  logoCircle: {
+  logo: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 16,
     marginBottom: spacing.lg,
-  },
-  logoEmoji: {
-    fontSize: 36,
   },
   appName: {
     ...typography.displayL,
@@ -194,6 +201,21 @@ const styles = StyleSheet.create({
   buttonText: {
     ...typography.h3,
     color: colors.surface,
+  },
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  registerText: {
+    ...typography.bodyM,
+    color: colors.textSecondary,
+  },
+  registerLink: {
+    ...typography.bodyM,
+    color: colors.primary,
+    fontWeight: '700',
   },
   hint: {
     marginTop: spacing['4xl'],
