@@ -1,4 +1,10 @@
-import React, { useState } from 'react';
+import { useAuth } from "@/context/AuthContext";
+import { register } from "@/services/auth.service";
+import { colors } from "@/theme/colors";
+import { spacing } from "@/theme/spacing";
+import { typography } from "@/theme/typography";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -10,43 +16,42 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { register } from '@/services/auth.service';
-import { colors } from '@/theme/colors';
-import { typography } from '@/theme/typography';
-import { spacing } from '@/theme/spacing';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [name, setName]         = useState('');
-  const [username, setUsername] = useState('');
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleRegister() {
     if (!name.trim() || !username.trim() || !email.trim() || !password.trim()) {
-      setError('Completá todos los campos');
+      setError("Completá todos los campos");
       return;
     }
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      setError("La contraseña debe tener al menos 6 caracteres");
       return;
     }
     setError(null);
     setLoading(true);
     try {
-      await register({ name: name.trim(), username: username.trim(), email: email.trim(), password });
+      await register({
+        name: name.trim(),
+        username: username.trim(),
+        email: email.trim(),
+        password,
+      });
       // Después de registrar, hacemos login automático para obtener el token
       await login({ email: email.trim(), password });
     } catch (e: any) {
-      setError(e.message ?? 'Error al registrarse');
+      setError(e.message ?? "Error al registrarse");
     } finally {
       setLoading(false);
     }
@@ -54,18 +59,25 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Logo */}
           <View style={styles.header}>
             <Image
-              source={require('@/assets/images/logo.png')}
+              source={require("@/assets/images/logo.png")}
               style={styles.logo}
               resizeMode="cover"
             />
             <Text style={styles.appName}>Sazón</Text>
-            <Text style={styles.subtitle}>¡Registrate para encontrar tus recetas favoritas!</Text>
+            <Text style={styles.subtitle}>
+              ¡Registrate para encontrar tus recetas favoritas!
+            </Text>
           </View>
 
           {/* Formulario */}
@@ -133,21 +145,21 @@ export default function RegisterScreen() {
               onPress={handleRegister}
               disabled={loading}
             >
-              {loading
-                ? <ActivityIndicator color={colors.surface} />
-                : <Text style={styles.buttonText}>Crear cuenta</Text>
-              }
+              {loading ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.buttonText}>Crear cuenta</Text>
+              )}
             </Pressable>
           </View>
 
           {/* Link a login */}
           <View style={styles.loginRow}>
             <Text style={styles.loginText}>¿Ya tenés cuenta?</Text>
-            <Pressable onPress={() => router.replace('/login')}>
+            <Pressable onPress={() => router.replace("/login")}>
               <Text style={styles.loginLink}> Iniciá sesión</Text>
             </Pressable>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -165,12 +177,12 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing['2xl'],
-    paddingBottom: spacing['2xl'],
+    paddingTop: spacing["2xl"],
+    paddingBottom: spacing["2xl"],
   },
   header: {
-    alignItems: 'center',
-    marginBottom: spacing['4xl'],
+    alignItems: "center",
+    marginBottom: spacing["4xl"],
   },
   logo: {
     width: 80,
@@ -186,7 +198,7 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.bodyM,
     color: colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   form: {
     gap: spacing.lg,
@@ -211,14 +223,14 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.bodyS,
     color: colors.error,
-    textAlign: 'center',
+    textAlign: "center",
   },
   button: {
     height: 52,
     backgroundColor: colors.primary,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: spacing.sm,
   },
   buttonDisabled: {
@@ -229,9 +241,9 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   loginRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: spacing.xl,
   },
   loginText: {
@@ -241,6 +253,6 @@ const styles = StyleSheet.create({
   loginLink: {
     ...typography.bodyM,
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

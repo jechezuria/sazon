@@ -1,10 +1,17 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-import { Feather } from '@expo/vector-icons';
-import { colors } from '@/theme/colors';
-import { shadows } from '@/theme/shadows';
+import { colors } from "@/theme/colors";
+import { shadows } from "@/theme/shadows";
+import { Feather } from "@expo/vector-icons";
+import { Redirect, Tabs } from "expo-router";
+import React from "react";
+import { useAuth } from "../../context/AuthContext";
 
 export default function TabLayout() {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Redirect href="/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -18,14 +25,14 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: "600",
         },
       }}
     >
       <Tabs.Screen
         name="(home)"
         options={{
-          title: 'Inicio',
+          title: "Inicio",
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),
@@ -34,7 +41,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="buscar"
         options={{
-          title: 'Buscar',
+          title: "Buscar",
           tabBarIcon: ({ color, size }) => (
             <Feather name="search" size={size} color={color} />
           ),
@@ -43,7 +50,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="perfil"
         options={{
-          title: 'Perfil',
+          title: "Perfil",
           tabBarIcon: ({ color, size }) => (
             <Feather name="user" size={size} color={color} />
           ),

@@ -1,4 +1,5 @@
 import {
+  AuthResponse,
   AuthUser,
   getMe,
   login as loginApi,
@@ -21,6 +22,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   loading: boolean;
   login: (input: LoginInput) => Promise<void>;
+  setSession: (res: AuthResponse) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -55,6 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   }
 
+  async function setSession(res: AuthResponse) {
+    await AsyncStorage.setItem(TOKEN_KEY, res.token);
+    setToken(res.token);
+    setUser(res.user);
+  }
+
   async function logout() {
     await AsyncStorage.removeItem(TOKEN_KEY);
     setToken(null);
@@ -62,7 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: token !== null, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        isAuthenticated: !!token,
+        login,
+        setSession,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
