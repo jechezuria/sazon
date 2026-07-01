@@ -12,10 +12,10 @@ Sazón es una app construida con Expo para explorar recetas, organizar favoritos
 
 ## Integrantes
 
-### jechezuria
+### Jorge Luis Echezuria Gonzalez
 Colaborador del proyecto. Se encarga de la implementación general de la app, la integración con el backend y la definición de la experiencia de usuario.
 
-### carpineiro17
+### Carolina Julieta Piñeiro
 Colaborador del proyecto con foco en soporte técnico y mejora de funcionalidades. Participa en ajustes de la interfaz, validación de flujos y mantenimiento del producto.
 
 ### Joaquin Olmedo
