@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -26,17 +26,23 @@ export default function FavoritosScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Volver">
+          <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Mis Favoritos</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mis Favoritos</Text>
-          <Text style={styles.headerSub}>
-            {likedRecipes.length === 0
-              ? 'Aún no guardaste recetas'
-              : `${likedRecipes.length} ${likedRecipes.length === 1 ? 'receta guardada' : 'recetas guardadas'}`}
-          </Text>
-        </View>
+        <Text style={styles.subTitle}>
+          {likedRecipes.length === 0
+            ? 'Aún no guardaste recetas'
+            : `${likedRecipes.length} ${likedRecipes.length === 1 ? 'receta guardada' : 'recetas guardadas'}`}
+        </Text>
 
         {likedRecipes.length === 0 ? (
           <View style={styles.emptyState}>
@@ -68,35 +74,31 @@ export default function FavoritosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  center: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    paddingBottom: spacing['4xl'],
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
+  center: { justifyContent: 'center', alignItems: 'center' },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingVertical: spacing.md,
   },
   headerTitle: {
-    ...typography.displayL,
+    ...typography.h1,
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
-  headerSub: {
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing['4xl'],
+  },
+  subTitle: {
     ...typography.bodyS,
     color: colors.textSecondary,
+    marginBottom: spacing.lg,
   },
   emptyState: {
     alignItems: 'center',
     paddingTop: spacing['4xl'],
-    paddingHorizontal: spacing['2xl'],
     gap: spacing.md,
   },
   emptyTitle: {
@@ -113,7 +115,6 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg,
     gap: CARD_GAP,
   },
 });

@@ -9,6 +9,7 @@ import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { useRecipe } from '@/hooks/useRecipes';
 import { useLikes } from '@/hooks/useLikes';
+import { useRecipeProgress } from '@/hooks/useRecipeProgress';
 
 function SmallAvatar({ name }: { name: string }) {
   const initials = name
@@ -48,8 +49,7 @@ export default function RecipeDetailScreen() {
   const { isLiked, toggleLike } = useLikes();
 
   const [activeTab, setActiveTab] = useState<Tab>('ingredientes');
-  const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [checkedSteps, setCheckedSteps] = useState<Set<string>>(new Set());
+  const { checkedIngredients, checkedSteps, toggleIngredient, toggleStep } = useRecipeProgress(id as string);
 
   if (loading) {
     return (
@@ -68,13 +68,6 @@ export default function RecipeDetailScreen() {
         </TouchableOpacity>
       </View>
     );
-  }
-
-  function toggleCheck(id: string) {
-    setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  }
-  function toggleStep(id: string) {
-    setCheckedSteps(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
   return (
@@ -135,13 +128,13 @@ export default function RecipeDetailScreen() {
             <Text style={styles.tabCount}>{recipe.ingredients.length} ingredientes</Text>
             {recipe.ingredients.map((ing, index) => (
               <React.Fragment key={ing.id}>
-                <TouchableOpacity style={styles.ingredientRow} onPress={() => toggleCheck(ing.id)} activeOpacity={0.7}>
-                  <View style={[styles.ingredientBadge, checked.has(ing.id) && styles.ingredientBadgeChecked]}>
-                    {checked.has(ing.id)
+                <TouchableOpacity style={styles.ingredientRow} onPress={() => toggleIngredient(ing.id)} activeOpacity={0.7}>
+                  <View style={[styles.ingredientBadge, checkedIngredients.has(ing.id) && styles.ingredientBadgeChecked]}>
+                    {checkedIngredients.has(ing.id)
                       ? <Ionicons name="checkmark" size={14} color={colors.surface} />
                       : <Text style={styles.ingredientNumber}>{index + 1}</Text>}
                   </View>
-                  <Text style={[styles.ingredientName, checked.has(ing.id) && styles.ingredientChecked]}>{ing.name}</Text>
+                  <Text style={[styles.ingredientName, checkedIngredients.has(ing.id) && styles.ingredientChecked]}>{ing.name}</Text>
                   <Text style={styles.ingredientAmount}>{ing.amount}</Text>
                 </TouchableOpacity>
                 {index < recipe.ingredients.length - 1 && <View style={styles.ingredientSep} />}

@@ -19,10 +19,10 @@ function RootNavigator() {
 
   useEffect(() => {
     if (loading) return;
-    const inLogin = segments[0] === "login";
-    if (!token && !inLogin) {
+    const inAuth = segments[0] === "login" || segments[0] === "register";
+    if (!token && !inAuth) {
       router.replace("/login");
-    } else if (token && inLogin) {
+    } else if (token && inAuth) {
       router.replace("/(tabs)");
     }
   }, [token, loading]);
@@ -49,18 +49,9 @@ function RootNavigator() {
         <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="recipe/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="likes" options={{ headerShown: false }} />
         <Stack.Screen name="crear/detalles" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="crear/ingredientes"
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="crear/ingredientes" options={{ headerShown: false }} />
         <Stack.Screen name="crear/pasos" options={{ headerShown: false }} />
-        <Stack.Screen name="perfil/editar" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="perfil/publicaciones"
-          options={{ headerShown: false }}
-        />
       </Stack>
       <StatusBar style="dark" backgroundColor="transparent" translucent />
     </LikesProvider>

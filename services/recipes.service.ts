@@ -34,6 +34,28 @@ export function getMyLikedRecipes(token: string): Promise<Recipe[]> {
   return apiRequest<Recipe[]>('/api/recipes/liked/mine', { token });
 }
 
+// POST /api/recipes — crea una nueva receta
+export interface CreateRecipeInput {
+  title: string;
+  description: string;
+  imageUrl: string;
+  category: Category;
+  difficulty: Difficulty;
+  cookTime: string;
+  servings: number;
+  tags: string[];
+  authorId: string;
+  ingredients: { name: string; amount: string }[];
+  steps: { description: string; order: number }[];
+}
+
+export function createRecipe(input: CreateRecipeInput): Promise<Recipe> {
+  return apiRequest<Recipe>('/api/recipes', {
+    method: 'POST',
+    body: input,
+  });
+}
+
 // POST /api/recipes/:id/like — requiere token. Toggle: alterna el estado de like.
 export function toggleRecipeLike(recipeId: string, token: string): Promise<{ liked: boolean }> {
   return apiRequest<{ liked: boolean }>(`/api/recipes/${recipeId}/like`, {

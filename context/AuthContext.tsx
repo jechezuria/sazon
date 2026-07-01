@@ -18,6 +18,7 @@ const TOKEN_KEY = "@sazon:token";
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
+  isAuthenticated: boolean;
   loading: boolean;
   login: (input: LoginInput) => Promise<void>;
   logout: () => Promise<void>;
@@ -61,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated: token !== null, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

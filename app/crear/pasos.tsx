@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +19,10 @@ import { typography } from '@/theme/typography';
 import { shadows } from '@/theme/shadows';
 import { recipeFormStore, StepDraft } from '@/store/recipeFormStore';
 import { StepperBar } from '@/components/atoms/StepperBar';
+import { useAuth } from '@/context/AuthContext';
+import { createRecipe } from '@/services/recipes.service';
+import { invalidateRecipesCache } from '@/hooks/useRecipes';
+import { Category, Difficulty } from '@/types';
 
 function newStep(): StepDraft {
   return { id: Date.now().toString(), description: '' };
@@ -25,10 +30,12 @@ function newStep(): StepDraft {
 
 export default function CrearPasosScreen() {
   const router = useRouter();
+  const { user } = useAuth();
 
   const [steps, setSteps] = useState<StepDraft[]>(
     recipeFormStore.get().steps
   );
+  const [submitting, setSubmitting] = useState(false);
 
   function addStep() {
     setSteps((prev) => [...prev, newStep()]);
@@ -45,25 +52,42 @@ export default function CrearPasosScreen() {
     );
   }
 
-  const canPublish = steps.some((s) => s.description.trim());
+  const canPublish = steps.some((s) => s.description.trim()) && !submitting;
 
-  function handlePublish() {
+  async function handlePublish() {
+    if (!user) return;
+
     recipeFormStore.update({ steps });
     const data = recipeFormStore.get();
 
-    Alert.alert(
-      '¡Receta lista!',
-      `"${data.title}" fue publicada con ${data.ingredients.length} ingrediente(s) y ${steps.length} paso(s).`,
-      [
-        {
-          text: 'Ver mis recetas',
-          onPress: () => {
-            recipeFormStore.reset();
-            router.replace('/(tabs)/perfil');
-          },
-        },
-      ]
-    );
+    setSubmitting(true);
+    try {
+      await createRecipe({
+        title: data.title,
+        description: data.description,
+        imageUrl: data.imageUri || '',
+        category: data.category as Category,
+        difficulty: data.difficulty as Difficulty,
+        cookTime: data.cookTime,
+        servings: parseInt(data.servings, 10) || 1,
+        tags: [],
+        authorId: user.id,
+        ingredients: data.ingredients
+          .filter((i) => i.name.trim())
+          .map(({ name, amount }) => ({ name, amount })),
+        steps: steps
+          .filter((s) => s.description.trim())
+          .map((s, index) => ({ description: s.description, order: index + 1 })),
+      });
+
+      invalidateRecipesCache();
+      recipeFormStore.reset();
+      router.replace('/(tabs)/perfil');
+    } catch (e: any) {
+      Alert.alert('Error al publicar', e.message ?? 'No se pudo publicar la receta. Intentá de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -129,7 +153,7 @@ export default function CrearPasosScreen() {
           ))}
 
           {/* ── AGREGAR PASO ── */}
-          <TouchableOpacity style={styles.addBtn} onPress={addStep} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.addBtn} onPress={addStep} activeOpacity={0.7} disabled={submitting}>
             <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
             <Text style={styles.addBtnText}>Agregar paso</Text>
           </TouchableOpacity>
@@ -141,13 +165,19 @@ export default function CrearPasosScreen() {
             disabled={!canPublish}
             activeOpacity={0.8}
           >
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={20}
-              color={colors.surface}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.publishBtnText}>Publicar receta</Text>
+            {submitting ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={20}
+                  color={colors.surface}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.publishBtnText}>Publicar receta</Text>
+              </>
+            )}
           </TouchableOpacity>
 
         </ScrollView>
