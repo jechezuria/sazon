@@ -23,6 +23,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (input: LoginInput) => Promise<void>;
   setSession: (res: AuthResponse) => Promise<void>;
+  updateUser: (updated: AuthUser) => void;
   logout: () => Promise<void>;
 }
 
@@ -63,6 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   }
 
+  function updateUser(updated: AuthUser) {
+    setUser(updated);
+  }
+
   async function logout() {
     await AsyncStorage.removeItem(TOKEN_KEY);
     setToken(null);
@@ -78,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!token,
         login,
         setSession,
+        updateUser,
         logout,
       }}
     >
