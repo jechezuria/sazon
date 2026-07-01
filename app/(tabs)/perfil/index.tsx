@@ -14,15 +14,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, uri }: { name: string; uri?: string | null }) {
   const initials = name
     .split(" ")
     .map((n) => n[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  if (uri) {
+    return <Image source={{ uri }} style={styles.avatar} contentFit="cover" />;
+  }
+
   return (
     <View style={styles.avatar}>
       <Text style={styles.avatarText}>{initials}</Text>
@@ -106,7 +112,7 @@ export default function PerfilScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <TouchableOpacity style={styles.profileCard} activeOpacity={0.8} onPress={() => router.push('/perfil/editar')}>
-          <Avatar name={user?.name ?? '?'} />
+          <Avatar name={user?.name ?? '?'} uri={user?.avatarUrl} />
           <View style={styles.profileInfo}>
             <Text style={[typography.h2, { color: colors.textPrimary }]}>{user?.name ?? ''}</Text>
             <Text style={[typography.caption, { color: colors.textSecondary, marginTop: 2 }]}>
