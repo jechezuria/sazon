@@ -11,3 +11,12 @@ export function getUserById(id: string): Promise<AuthUser> {
 export function getRecipesByUser(id: string): Promise<Recipe[]> {
   return apiRequest<Recipe[]>(`/api/users/${id}/recipes`);
 }
+
+// PUT /api/users/me/password — requiere token
+export function changePassword(newPassword: string, token: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/api/users/me/password', {
+    method: 'PUT',
+    body: { newPassword },
+    token,
+  });
+}

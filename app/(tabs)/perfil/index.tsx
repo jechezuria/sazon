@@ -124,7 +124,7 @@ export default function PerfilScreen() {
         <Section title="Mi cuenta">
           <MenuItem icon="person-outline" label="Editar perfil" onPress={() => router.push('/perfil/editar')} />
           <Separator />
-          <MenuItem icon="lock-closed-outline" label="Cambiar contraseña" onPress={() => {}} />
+          <MenuItem icon="lock-closed-outline" label="Cambiar contraseña" onPress={() => router.push('/perfil/cambiar-password')} />
         </Section>
 
         <Section title="Contenido">
