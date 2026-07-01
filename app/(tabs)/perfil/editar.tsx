@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,16 +11,27 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_USER } from '@/data/mockData';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '@/context/AuthContext';
+import { updateProfile } from '@/services/users.service';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { shadows } from '@/theme/shadows';
 
-// ─── Avatar editable ──────────────────────────────────────────────────────────
-function AvatarPicker({ name }: { name: string }) {
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+function AvatarDisplay({
+  name,
+  uri,
+  onPress,
+}: {
+  name: string;
+  uri: string | null;
+  onPress: () => void;
+}) {
   const initials = name
     .split(' ')
     .map((n) => n[0] ?? '')
@@ -27,10 +40,14 @@ function AvatarPicker({ name }: { name: string }) {
     .toUpperCase();
 
   return (
-    <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.8}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{initials || '?'}</Text>
-      </View>
+    <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.8} onPress={onPress}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.avatarImage} contentFit="cover" />
+      ) : (
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initials || '?'}</Text>
+        </View>
+      )}
       <View style={styles.cameraBadge}>
         <Ionicons name="camera" size={14} color={colors.surface} />
       </View>
@@ -41,19 +58,94 @@ function AvatarPicker({ name }: { name: string }) {
 // ─── Pantalla Editar Perfil ───────────────────────────────────────────────────
 export default function EditarPerfilScreen() {
   const router = useRouter();
-  const user   = MOCK_USER;
+  const { user, token, updateUser } = useAuth();
 
-  const [firstName,    setFirstName]    = useState(user.name.split(' ')[0] ?? '');
-  const [lastName,     setLastName]     = useState(user.name.split(' ')[1] ?? '');
-  const [bio,          setBio]          = useState(user.bio ?? '');
+  const nameParts  = (user?.name ?? '').split(' ');
+  const initFirst  = nameParts[0] ?? '';
+  const initLast   = nameParts.slice(1).join(' ');
+
+  const [firstName,    setFirstName]    = useState(initFirst);
+  const [lastName,     setLastName]     = useState(initLast);
+  const [bio,          setBio]          = useState(user?.bio ?? '');
+  const [avatarUri,    setAvatarUri]    = useState<string | null>(user?.avatarUrl ?? null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [saving,       setSaving]       = useState(false);
 
   const canSave = firstName.trim().length > 0;
 
-  function handleSave() {
-    if (!canSave) return;
-    // TODO: persistir cambios
-    router.back();
+  // ── Lógica foto ─────────────────────────────────────────────────────────────
+  async function handlePickPhoto() {
+    Alert.alert('Foto de perfil', 'Elegí una opción', [
+      {
+        text: 'Sacar foto',
+        onPress: launchCamera,
+      },
+      {
+        text: 'Elegir de galería',
+        onPress: launchGallery,
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  async function launchCamera() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'No podemos acceder a tu cámara sin permiso.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.4,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setAvatarUri(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  }
+
+  async function launchGallery() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'No podemos acceder a tus fotos sin permiso.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.4,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setAvatarUri(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  }
+
+  // ── Guardar ──────────────────────────────────────────────────────────────────
+  async function handleSave() {
+    if (!canSave || !token) return;
+    setSaving(true);
+    try {
+      const updated = await updateProfile(
+        {
+          name:      `${firstName.trim()} ${lastName.trim()}`.trim(),
+          bio:       bio.trim() || undefined,
+          avatarUrl: avatarUri ?? undefined,
+        },
+        token,
+      );
+      updateUser(updated);
+      Alert.alert('Listo', 'Perfil actualizado correctamente.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (e: any) {
+      console.error('[EditarPerfil] Error al guardar:', e);
+      Alert.alert('Error al guardar', e.message ?? 'No se pudieron guardar los cambios. Revisá tu conexión.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -67,15 +159,15 @@ export default function EditarPerfilScreen() {
 
         <Text style={[typography.h1, { color: colors.textPrimary }]}>Editar perfil</Text>
 
-        <TouchableOpacity onPress={handleSave} disabled={!canSave} accessibilityLabel="Guardar">
-          <Text style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}>Guardar</Text>
+        <TouchableOpacity onPress={handleSave} disabled={!canSave || saving} accessibilityLabel="Guardar">
+          {saving
+            ? <ActivityIndicator size="small" color={colors.primary} />
+            : <Text style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}>Guardar</Text>
+          }
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
@@ -84,8 +176,14 @@ export default function EditarPerfilScreen() {
 
           {/* ── FOTO ── */}
           <View style={styles.avatarSection}>
-            <AvatarPicker name={`${firstName} ${lastName}`} />
-            <Text style={styles.changePhotoLabel}>Cambiar foto</Text>
+            <AvatarDisplay
+              name={`${firstName} ${lastName}`}
+              uri={avatarUri}
+              onPress={handlePickPhoto}
+            />
+            <TouchableOpacity onPress={handlePickPhoto}>
+              <Text style={styles.changePhotoLabel}>Cambiar foto</Text>
+            </TouchableOpacity>
           </View>
 
           {/* ── DATOS PERSONALES ── */}
@@ -144,12 +242,15 @@ export default function EditarPerfilScreen() {
 
           {/* ── BOTÓN GUARDAR ── */}
           <TouchableOpacity
-            style={[styles.saveButtonFull, !canSave && styles.saveButtonDisabled]}
+            style={[styles.saveButtonFull, (!canSave || saving) && styles.saveButtonDisabled]}
             onPress={handleSave}
-            disabled={!canSave}
+            disabled={!canSave || saving}
             activeOpacity={0.8}
           >
-            <Text style={styles.saveButtonText}>Guardar cambios</Text>
+            {saving
+              ? <ActivityIndicator color={colors.surface} />
+              : <Text style={styles.saveButtonText}>Guardar cambios</Text>
+            }
           </TouchableOpacity>
 
         </ScrollView>
@@ -178,21 +279,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  scroll: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
+  scroll: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  // Avatar
-  avatarSection: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  avatarWrap: {
-    position: 'relative',
-    width: 80,
-    height: 80,
-  },
+  avatarSection: { alignItems: 'center', paddingVertical: 24 },
+  avatarWrap: { position: 'relative', width: 80, height: 80 },
   avatar: {
     width: 80,
     height: 80,
@@ -201,11 +291,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
-    ...typography.h1,
-    color: colors.primary,
-    fontSize: 28,
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
+  avatarText: { ...typography.h1, color: colors.primary, fontSize: 28 },
   cameraBadge: {
     position: 'absolute',
     bottom: 0,
@@ -226,12 +317,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  sectionLabel: {
-    ...typography.label,
-    color: colors.textMuted,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
+  sectionLabel: { ...typography.label, color: colors.textMuted, marginBottom: 8, marginLeft: 4 },
 
   card: {
     backgroundColor: colors.surface,
@@ -241,18 +327,8 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
 
-  fieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    minHeight: 52,
-  },
-  fieldLabel: {
-    ...typography.bodyM,
-    color: colors.textSecondary,
-    width: 80,
-    flexShrink: 0,
-  },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
+  fieldLabel: { ...typography.bodyM, color: colors.textSecondary, width: 80, flexShrink: 0 },
   input: {
     flex: 1,
     height: 44,
@@ -263,17 +339,10 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     paddingHorizontal: 8,
   },
-  inputFocused: {
-    borderColor: colors.primaryMid,
-  },
+  inputFocused: { borderColor: colors.primaryMid },
 
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginLeft: 16,
-  },
+  divider: { height: 1, backgroundColor: colors.border, marginLeft: 16 },
 
-  // Bio
   bioInput: {
     minHeight: 96,
     ...typography.bodyM,
@@ -293,7 +362,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
 
-  // Botón guardar
   saveButtonFull: {
     backgroundColor: colors.primary,
     borderRadius: 9999,
@@ -303,13 +371,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     ...shadows.float,
   },
-  saveButtonDisabled: {
-    backgroundColor: colors.textMuted,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  saveButtonText: {
-    ...typography.button,
-    color: colors.surface,
-  },
+  saveButtonDisabled: { backgroundColor: colors.textMuted, shadowOpacity: 0, elevation: 0 },
+  saveButtonText: { ...typography.button, color: colors.surface },
 });
