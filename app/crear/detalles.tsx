@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,9 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { shadows } from '@/theme/shadows';
@@ -33,12 +36,57 @@ export default function CrearDetallesScreen() {
   const [difficulty,   setDifficulty]   = useState<Difficulty | ''>(saved.difficulty);
   const [cookTime,     setCookTime]     = useState(saved.cookTime);
   const [servings,     setServings]     = useState(saved.servings);
+  const [imageUri,     setImageUri]     = useState<string>(saved.imageUri ?? '');
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const canGoNext = !!(title.trim() && category && difficulty && cookTime.trim() && servings.trim());
 
+  async function handlePickPhoto() {
+    Alert.alert('Foto de la receta', 'Elegí una opción', [
+      { text: 'Sacar foto',        onPress: launchCamera  },
+      { text: 'Elegir de galería', onPress: launchGallery },
+      ...(imageUri ? [{ text: 'Eliminar foto', style: 'destructive' as const, onPress: () => setImageUri('') }] : []),
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  async function launchCamera() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'No podemos acceder a tu cámara sin permiso.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setImageUri(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  }
+
+  async function launchGallery() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'No podemos acceder a tus fotos sin permiso.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setImageUri(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  }
+
   function handleNext() {
-    recipeFormStore.update({ title, description, category, difficulty, cookTime, servings });
+    recipeFormStore.update({ title, description, category, difficulty, cookTime, servings, imageUri });
     router.push('/crear/ingredientes');
   }
 
@@ -68,10 +116,22 @@ export default function CrearDetallesScreen() {
         >
 
           {/* ── FOTO ── */}
-          <TouchableOpacity style={styles.photoArea} activeOpacity={0.7}>
-            <Ionicons name="camera-outline" size={36} color={colors.textMuted} />
-            <Text style={styles.photoText}>Agregar foto de la receta</Text>
-            <Text style={styles.photoHint}>Tocá para seleccionar</Text>
+          <TouchableOpacity style={styles.photoArea} activeOpacity={0.7} onPress={handlePickPhoto}>
+            {imageUri ? (
+              <>
+                <Image source={{ uri: imageUri }} style={styles.photoImage} contentFit="cover" />
+                <View style={styles.photoOverlay}>
+                  <Ionicons name="camera-outline" size={24} color="#fff" />
+                  <Text style={styles.photoOverlayText}>Cambiar foto</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Ionicons name="camera-outline" size={36} color={colors.textMuted} />
+                <Text style={styles.photoText}>Agregar foto de la receta</Text>
+                <Text style={styles.photoHint}>Tocá para seleccionar</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           {/* ── TÍTULO ── */}
@@ -218,6 +278,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginBottom: 20,
+  },
+  photoImage: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 14,
+  },
+  photoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoOverlayText: {
+    ...typography.bodyS,
+    color: '#fff',
+    fontWeight: '600',
   },
   photoText: {
     ...typography.bodyM,
