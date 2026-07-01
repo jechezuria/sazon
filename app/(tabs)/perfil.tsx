@@ -203,7 +203,7 @@ export default function PerfilScreen() {
           <MenuItem
             icon="bookmark-outline"
             label="Mis publicaciones"
-            onPress={() => {}}
+            onPress={() => router.push('/perfil/publicaciones')}
           />
           <Separator/>
           <MenuItem
